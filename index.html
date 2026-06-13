@@ -374,6 +374,10 @@
       <span class="step-status" id="status4">Pending</span>
     </div>
     <div class="step-body">
+      <div class="warn hide" id="stale-banner" style="display:flex;align-items:center;gap:12px;justify-content:space-between;">
+        <span>⚠ The column mapping has changed since the last analysis. Re-run to refresh the matrix and the export.</span>
+        <button class="btn small" id="rerun-btn">Re-run analysis</button>
+      </div>
       <div class="counters" id="counters"></div>
       <div class="legend">
         <span><span class="swatch" style="background:var(--green-bg)"></span> Stable (±5%)</span>
@@ -468,10 +472,11 @@ const state = {
     showPrevValue: true,    // previous value of cmpCol
     showNewValue: true,     // new value of cmpCol (= cmpCol from new file)
     showDeltaPct: true,
-    showRowType: true,      // export-only built-in
-    showBucket: true,       // export-only built-in
+    showRowType: false,     // export-only built-in (default OFF — user said they don't need it)
+    showBucket: false,      // export-only built-in (default OFF)
     extras: [],             // ordered list of feed column names (beyond reserved)
   },
+  lastRunFingerprint: null, // snapshot of mapping when runAnalysis last ran
 };
 
 const $ = (s) => document.querySelector(s);
@@ -498,6 +503,7 @@ const $$ = (s) => Array.from(document.querySelectorAll(s));
   $('#clear-sort').addEventListener('click', () => { state.resultsSort = { col: null, dir: null }; renderResults(); });
   $('#customize-cols').addEventListener('click', openColumnPicker);
   $('#open-export').addEventListener('click', openExportModal);
+  $('#rerun-btn').addEventListener('click', () => runAnalysis());
   $('#export-close').addEventListener('click', closeExport);
   $('#export-cancel').addEventListener('click', closeExport);
   $('#export-go').addEventListener('click', runExportXlsx);
@@ -836,8 +842,8 @@ function populateMapping() {
   state.mapping.groupByCols = state.mapping.groupByCols.filter(c => inter.includes(c));
   state.mapping.cmps = state.mapping.cmps.map(c => inter.includes(c) ? c : '');
 
-  mountMultiSelect('#ms-matchKeys', inter, state.mapping.matchKeys, sel => { state.mapping.matchKeys = sel; updateStep3Status(); }, 'Click to pick one or more columns…');
-  mountMultiSelect('#ms-groupBy', inter, state.mapping.groupByCols, sel => { state.mapping.groupByCols = sel; updateStep3Status(); }, 'Click to pick one or more columns (or none)…');
+  mountMultiSelect('#ms-matchKeys', inter, state.mapping.matchKeys, sel => { state.mapping.matchKeys = sel; updateStep3Status(); onMappingChanged(); }, 'Click to pick one or more columns…');
+  mountMultiSelect('#ms-groupBy', inter, state.mapping.groupByCols, sel => { state.mapping.groupByCols = sel; updateStep3Status(); onMappingChanged(); }, 'Click to pick one or more columns (or none)…');
   renderCmpList();
   updateStep3Status();
 }
@@ -861,9 +867,9 @@ function renderCmpList() {
       <select data-i="${i}"><option value="">— pick a column to compare —</option>${opts}</select>
       ${state.mapping.cmps.length > 1 ? `<button class="remove" data-rm="${i}" title="Remove">×</button>` : ''}
     `;
-    row.querySelector('select').addEventListener('change', e => { state.mapping.cmps[i] = e.target.value; updateStep3Status(); });
+    row.querySelector('select').addEventListener('change', e => { state.mapping.cmps[i] = e.target.value; updateStep3Status(); onMappingChanged(); });
     const rm = row.querySelector('[data-rm]');
-    if (rm) rm.addEventListener('click', () => { state.mapping.cmps.splice(i, 1); renderCmpList(); updateStep3Status(); });
+    if (rm) rm.addEventListener('click', () => { state.mapping.cmps.splice(i, 1); renderCmpList(); updateStep3Status(); onMappingChanged(); });
     wrap.appendChild(row);
   });
 }
@@ -872,7 +878,36 @@ function captureMapping() {
   const edges = $('#bucket-edges').value.split(',').map(s => Number(s.trim())).filter(n => Number.isFinite(n));
   edges.sort((a,b) => a-b);
   state.mapping.edges = edges;
+  refreshStaleBanner();
 }
+
+function mappingFingerprint() {
+  captureBucketEdges();
+  return JSON.stringify({
+    matchKeys: state.mapping.matchKeys,
+    groupByCols: state.mapping.groupByCols,
+    cmps: state.mapping.cmps.filter(Boolean),
+    edges: state.mapping.edges,
+    prevId: state.prevId,
+    newId: state.newId,
+  });
+}
+function captureBucketEdges() {
+  const inp = $('#bucket-edges');
+  if (!inp) return;
+  const edges = inp.value.split(',').map(s => Number(s.trim())).filter(n => Number.isFinite(n));
+  edges.sort((a,b) => a-b);
+  state.mapping.edges = edges;
+}
+function isStale() {
+  return !!(state.results && state.lastRunFingerprint && state.lastRunFingerprint !== mappingFingerprint());
+}
+function refreshStaleBanner() {
+  const b = $('#stale-banner');
+  if (!b) return;
+  b.classList.toggle('hide', !isStale());
+}
+function onMappingChanged() { refreshStaleBanner(); }
 
 // ===========================================================================
 // Multi-select dropdown
@@ -1024,10 +1059,12 @@ function runAnalysis() {
     prevFileName: prevE.file.name, newFileName: newE.file.name,
     prevRowCount: prevRows.length, newRowCount: newRows.length,
   };
+  state.lastRunFingerprint = mappingFingerprint();
   $('#step4').classList.remove('disabled');
   $('#status4').textContent = 'Done';
   $('#status4').classList.add('ok');
   expandOnly('step4');
+  refreshStaleBanner();
   renderResults();
   document.getElementById('step4').scrollIntoView({ behavior: 'smooth', block: 'start' });
   updateStepper();
@@ -1580,6 +1617,11 @@ const FILTER_OPS = [
 
 function openExportModal() {
   if (!state.results) return;
+  if (isStale()) {
+    // Mapping changed since last run — re-run silently so the export uses the latest mapping
+    runAnalysis();
+    if (!state.results) return;
+  }
   state.export = {
     pctMode: 'any',           // any | range | absMin | topMaxN | topMinN | topBothN
     pctMin: null, pctMax: null, absMin: null, topN: 50,
@@ -1803,106 +1845,139 @@ function applyFilter(row, filt) {
   return true;
 }
 
-function collectExportRowsForCmp(cmpCol) {
+// One unified row per unique SKU, carrying every cmpCol's status (matched/dropped/new/missing) and pct.
+function collectCombinedExportEntries() {
   const e = state.export; if (!e) return [];
   const labels = bucketLabels(state.results.edges);
-  const groupMap = state.results.results[cmpCol].groups;
+  const entries = new Map(); // matchKey -> { prev, new, perCmp: {[cmpCol]: {ov, nv, pct, kind, bucket}} }
 
-  // Collect bucketed (matched) rows
-  const matched = [];
-  for (const [_, g] of groupMap) {
-    for (let bi = 0; bi < labels.length; bi++) {
-      for (const r of (g.rows[bi] || [])) {
-        matched.push({ ...r, kind: 'matched', bucket: labels[bi] });
+  for (const cmpCol of state.results.cmps) {
+    const groupMap = state.results.results[cmpCol].groups;
+    for (const [_, g] of groupMap) {
+      for (let bi = 0; bi < labels.length; bi++) {
+        for (const r of (g.rows[bi] || [])) {
+          let en = entries.get(r.key);
+          if (!en) { en = { prev: r.prev, new: r.new, perCmp: {} }; entries.set(r.key, en); }
+          en.perCmp[cmpCol] = { ov: r.ov, nv: r.nv, pct: r.pct, kind: 'matched', bucket: labels[bi] };
+        }
+      }
+      for (const kind of ['dropped', 'new', 'missing']) {
+        for (const r of g.specialRows[kind]) {
+          let en = entries.get(r.key);
+          if (!en) { en = { prev: r.prev, new: r.new, perCmp: {} }; entries.set(r.key, en); }
+          en.perCmp[cmpCol] = { ov: r.ov || null, nv: r.nv || null, pct: null, kind, bucket: '' };
+        }
       }
     }
   }
 
-  // Apply % filter to matched rows only
-  let keptMatched;
-  if (e.pctMode === 'any') {
-    keptMatched = matched;
-  } else if (e.pctMode === 'range') {
-    keptMatched = matched.filter(r => {
-      if (e.pctMin != null && (!Number.isFinite(r.pct) || r.pct < e.pctMin)) return false;
-      if (e.pctMax != null && Number.isFinite(r.pct) && r.pct > e.pctMax) return false;
+  let arr = Array.from(entries.values());
+
+  // % filter — applied OR across compare columns (row passes if any cmpCol satisfies)
+  if (e.pctMode === 'range') {
+    arr = arr.filter(en => Object.values(en.perCmp).some(pc => {
+      if (!Number.isFinite(pc.pct)) return false;
+      if (e.pctMin != null && pc.pct < e.pctMin) return false;
+      if (e.pctMax != null && pc.pct > e.pctMax) return false;
       return true;
-    });
+    }));
   } else if (e.pctMode === 'absMin') {
-    if (e.absMin == null) keptMatched = matched;
-    else keptMatched = matched.filter(r => Number.isFinite(r.pct) && Math.abs(r.pct) >= e.absMin);
+    if (e.absMin != null) {
+      arr = arr.filter(en => Object.values(en.perCmp).some(pc => Number.isFinite(pc.pct) && Math.abs(pc.pct) >= e.absMin));
+    }
   } else if (e.pctMode === 'topMaxN') {
-    keptMatched = matched.filter(r => Number.isFinite(r.pct)).sort((a,b) => b.pct - a.pct).slice(0, e.topN);
+    arr = arr.filter(entryHasFinitePct).sort((a, b) => entryMaxPct(b) - entryMaxPct(a)).slice(0, e.topN);
   } else if (e.pctMode === 'topMinN') {
-    keptMatched = matched.filter(r => Number.isFinite(r.pct)).sort((a,b) => a.pct - b.pct).slice(0, e.topN);
+    arr = arr.filter(entryHasFinitePct).sort((a, b) => entryMinPct(a) - entryMinPct(b)).slice(0, e.topN);
   } else if (e.pctMode === 'topBothN') {
-    const finite = matched.filter(r => Number.isFinite(r.pct));
-    const high = finite.slice().sort((a,b) => b.pct - a.pct).slice(0, e.topN);
-    const low = finite.slice().sort((a,b) => a.pct - b.pct).slice(0, e.topN);
+    const finite = arr.filter(entryHasFinitePct);
+    const high = finite.slice().sort((a, b) => entryMaxPct(b) - entryMaxPct(a)).slice(0, e.topN);
+    const low = finite.slice().sort((a, b) => entryMinPct(a) - entryMinPct(b)).slice(0, e.topN);
     const seen = new Set();
-    keptMatched = [...high, ...low].filter(r => { const k = r.key; if (seen.has(k)) return false; seen.add(k); return true; });
-  } else {
-    keptMatched = matched;
+    arr = [...high, ...low].filter(en => { const k = entryKey(en); if (seen.has(k)) return false; seen.add(k); return true; });
   }
 
-  // Apply column filters
+  // Column filters — applied to feed values of the row
   if (e.filters && e.filters.length) {
-    keptMatched = keptMatched.filter(r => e.filters.every(f => applyFilter(r, f)));
+    arr = arr.filter(en => e.filters.every(f => applyFilterToEntry(en, f)));
   }
 
-  const out = [...keptMatched];
-
-  // Specials — only in non-top modes
+  // Specials inclusion (non-top modes only — Top-N modes already require finite pct)
   const inTop = e.pctMode.startsWith('top');
   if (!inTop) {
-    const specialsOut = [];
-    for (const [_, g] of groupMap) {
-      if (e.includeSpecials.dropped) for (const r of g.specialRows.dropped) specialsOut.push({ ...r, kind: 'dropped', bucket: '' });
-      if (e.includeSpecials.new) for (const r of g.specialRows.new) specialsOut.push({ ...r, kind: 'new', bucket: '' });
-      if (e.includeSpecials.missing) for (const r of g.specialRows.missing) specialsOut.push({ ...r, kind: 'missing', bucket: '' });
-    }
-    const finalSpecials = (e.filters && e.filters.length)
-      ? specialsOut.filter(r => e.filters.every(f => applyFilter(r, f)))
-      : specialsOut;
-    out.push(...finalSpecials);
+    arr = arr.filter(en => {
+      const kinds = Object.values(en.perCmp).map(pc => pc.kind);
+      if (kinds.includes('matched')) return true;
+      return kinds.some(k => e.includeSpecials[k]);
+    });
   }
 
-  return out;
+  return arr;
 }
 
-function updateExportSummary() {
-  if (!state.export) return;
-  let total = 0;
-  for (const cmpCol of state.results.cmps) total += collectExportRowsForCmp(cmpCol).length;
-  $('#export-summary').textContent = `${total.toLocaleString()} row(s) match (across ${state.results.cmps.length} compare column${state.results.cmps.length > 1 ? 's' : ''})`;
+function entryHasFinitePct(en) { return Object.values(en.perCmp).some(pc => Number.isFinite(pc.pct)); }
+function entryMaxPct(en) {
+  let m = -Infinity;
+  for (const pc of Object.values(en.perCmp)) if (Number.isFinite(pc.pct) && pc.pct > m) m = pc.pct;
+  return m;
+}
+function entryMinPct(en) {
+  let m = Infinity;
+  for (const pc of Object.values(en.perCmp)) if (Number.isFinite(pc.pct) && pc.pct < m) m = pc.pct;
+  return m;
+}
+function entryKey(en) { return state.results.matchKeys.map(c => pickFromEntry(en, c)).join('||'); }
+function pickFromEntry(en, c) {
+  const nr = en.new || {}, pr = en.prev || {};
+  return (nr[c] != null && nr[c] !== '') ? nr[c] : (pr[c] || '');
+}
+function applyFilterToEntry(en, filt) {
+  if (!filt.col) return true;
+  const v = pickFromEntry(en, filt.col);
+  const s = String(v == null ? '' : v);
+  const val = filt.val == null ? '' : String(filt.val);
+  const sl = s.toLowerCase(), vl = val.toLowerCase();
+  switch (filt.op) {
+    case 'contains': return sl.includes(vl);
+    case 'ncontains': return !sl.includes(vl);
+    case 'eq': return sl === vl;
+    case 'neq': return sl !== vl;
+    case 'starts': return sl.startsWith(vl);
+    case 'ends': return sl.endsWith(vl);
+    case 'gte': return Number(s) >= Number(val);
+    case 'lte': return Number(s) <= Number(val);
+    case 'gt': return Number(s) > Number(val);
+    case 'lt': return Number(s) < Number(val);
+    case 'empty': return !s;
+    case 'nempty': return !!s;
+  }
+  return true;
 }
 
-function buildExportColumnsForCmp(cmpCol) {
-  // Returns an ordered list of { key, getValue } for one sheet
+function buildCombinedExportColumns() {
   const e = state.export;
   const p = state.columnPrefs;
   const newE = state.pool.find(en => en.id === state.newId);
   const allFeedCols = newE ? newE.parsed.cols : [];
+  const cmps = state.results.cmps;
   const cols = [];
 
   if (e.personalize) {
-    if (p.showRowType)   cols.push({ key: 'row_type', getValue: r => r.kind });
-    if (p.showBucket)    cols.push({ key: 'bucket',    getValue: r => r.bucket || '' });
-    if (p.showMatchKeys) state.results.matchKeys.forEach(c => cols.push({ key: c, getValue: r => pickFromRow(r, c) }));
-    if (p.showGroupBys)  state.results.groupByCols.forEach(c => { if (!state.results.matchKeys.includes(c)) cols.push({ key: c, getValue: r => pickFromRow(r, c) }); });
-    if (p.showNewValue)  cols.push({ key: cmpCol + ' (new)', getValue: r => (r.new || {})[cmpCol] || '' });
-    if (p.showPrevValue) cols.push({ key: cmpCol + ' (previous)', getValue: r => (r.prev || {})[cmpCol] || '' });
-    if (p.showDeltaPct)  cols.push({ key: 'delta_pct', getValue: r => formatPctForExport(r.pct) });
-    // Extras (other feed columns)
-    const reserved = new Set([...state.results.matchKeys, ...state.results.groupByCols, cmpCol]);
-    p.extras.forEach(c => { if (!reserved.has(c)) cols.push({ key: c, getValue: r => pickFromRow(r, c) }); });
+    if (p.showRowType) cmps.forEach(c => cols.push({ key: cmps.length > 1 ? `row_type (${c})` : 'row_type', getValue: en => (en.perCmp[c] || {}).kind || '' }));
+    if (p.showBucket)  cmps.forEach(c => cols.push({ key: cmps.length > 1 ? `bucket (${c})` : 'bucket', getValue: en => (en.perCmp[c] || {}).bucket || '' }));
+    if (p.showMatchKeys) state.results.matchKeys.forEach(c => cols.push({ key: c, getValue: en => pickFromEntry(en, c) }));
+    if (p.showGroupBys) state.results.groupByCols.forEach(c => { if (!state.results.matchKeys.includes(c)) cols.push({ key: c, getValue: en => pickFromEntry(en, c) }); });
+    if (p.showNewValue) cmps.forEach(c => cols.push({ key: cmps.length > 1 ? c + ' (new)' : c, getValue: en => (en.new || {})[c] || '' }));
+    if (p.showPrevValue) cmps.forEach(c => cols.push({ key: c + ' (previous)', getValue: en => (en.prev || {})[c] || '' }));
+    if (p.showDeltaPct) cmps.forEach(c => cols.push({ key: 'delta_pct (' + c + ')', getValue: en => { const pc = en.perCmp[c]; return pc && pc.pct != null ? formatPctForExport(pc.pct) : ''; } }));
+    const reserved = new Set([...state.results.matchKeys, ...state.results.groupByCols, ...cmps]);
+    p.extras.forEach(c => { if (!reserved.has(c)) cols.push({ key: c, getValue: en => pickFromEntry(en, c) }); });
   } else {
-    // Default: row_type, bucket, all feed cols (new file's order), previous value of cmpCol, delta_pct
-    cols.push({ key: 'row_type', getValue: r => r.kind });
-    cols.push({ key: 'bucket',    getValue: r => r.bucket || '' });
-    allFeedCols.forEach(c => cols.push({ key: c, getValue: r => pickFromRow(r, c) }));
-    cols.push({ key: cmpCol + ' (previous)', getValue: r => (r.prev || {})[cmpCol] || '' });
-    cols.push({ key: 'delta_pct', getValue: r => formatPctForExport(r.pct) });
+    // Default: all feed cols (in new-file order) + per cmpCol (previous value + delta_pct)
+    // NO row_type, NO bucket.
+    allFeedCols.forEach(c => cols.push({ key: c, getValue: en => pickFromEntry(en, c) }));
+    cmps.forEach(c => cols.push({ key: c + ' (previous)', getValue: en => (en.prev || {})[c] || '' }));
+    cmps.forEach(c => cols.push({ key: 'delta_pct (' + c + ')', getValue: en => { const pc = en.perCmp[c]; return pc && pc.pct != null ? formatPctForExport(pc.pct) : ''; } }));
   }
   return cols;
 }
@@ -1917,19 +1992,21 @@ function formatPctForExport(p) {
   return Number(p);
 }
 
+function updateExportSummary() {
+  if (!state.export) return;
+  const n = collectCombinedExportEntries().length;
+  const ncmp = state.results.cmps.length;
+  $('#export-summary').textContent = `${n.toLocaleString()} row(s) match — one row per unique SKU across ${ncmp} compare column${ncmp > 1 ? 's' : ''}`;
+}
+
 function runExportXlsx() {
   if (!state.export) return;
-  const sheets = [];
-  for (const cmpCol of state.results.cmps) {
-    const rows = collectExportRowsForCmp(cmpCol);
-    if (!rows.length) continue;
-    const cols = buildExportColumnsForCmp(cmpCol);
-    const aoa = [cols.map(c => c.key)];
-    for (const r of rows) aoa.push(cols.map(c => c.getValue(r)));
-    sheets.push({ name: sanitize(cmpCol).slice(0, 28) || 'QC', aoa });
-  }
-  if (!sheets.length) { alert('No rows match the current filters.'); return; }
-  writeXlsx(sheets, `qc_export_${Date.now()}.xlsx`);
+  const entries = collectCombinedExportEntries();
+  if (!entries.length) { alert('No rows match the current filters.'); return; }
+  const cols = buildCombinedExportColumns();
+  const aoa = [cols.map(c => c.key)];
+  for (const en of entries) aoa.push(cols.map(c => c.getValue(en)));
+  writeXlsx([{ name: 'QC export', aoa }], `qc_export_${Date.now()}.xlsx`);
   closeExport();
 }
 
