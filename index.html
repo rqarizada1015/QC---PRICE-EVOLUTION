@@ -185,6 +185,12 @@
   .matrix td.strong { background: var(--orange); color: white; font-weight: 700; }
   .matrix td.heavy { background: var(--pink); font-weight: 700; }
   .matrix td.extreme { background: var(--red); color: white; font-weight: 700; }
+  .matrix td.total { background: #f4f6fa; font-weight: 700; }
+  .matrix td.delta-pos { background: #e9f7ef; color: var(--green); font-weight: 700; }
+  .matrix td.delta-neg { background: #fce9e9; color: var(--red-strong); font-weight: 700; }
+  .matrix td.delta-zero { background: #f4f6fa; color: var(--muted); }
+  .matrix td.special { background: #f0f3f8; color: var(--ink); font-weight: 600; }
+  .matrix td.matched-cell { background: var(--green-bg); color: white; font-weight: 700; }
 
   .legend { display: flex; gap: 14px; flex-wrap: wrap; margin: 0 0 16px; font-size: 12px; color: var(--muted); align-items: center; }
   .legend .swatch { display: inline-block; width: 14px; height: 14px; border-radius: 3px; vertical-align: middle; margin-right: 5px; }
@@ -1268,62 +1274,76 @@ function openGroupOverview(cmpCol, groupKey) {
 }
 
 function renderGroupOverview() {
-  const d = state.drawer; const o = d.overview;
-  const dCls = o.dRows > 0 ? 'pos' : o.dRows < 0 ? 'neg' : 'dim';
-  const dTxt = (o.dRows > 0 ? '+' : '') + o.dRows.toLocaleString();
+  const d = state.drawer;
+  const cmps = state.results.cmps;
+  const groupKey = d.groupKey;
 
-  const html = `
-    <div class="overview-wrap">
-      <table class="overview-table">
-        <thead><tr><th style="width:55%">Statistic</th><th style="width:25%;text-align:right;">Count</th><th style="width:20%;text-align:right;">Action</th></tr></thead>
-        <tbody>
-          <tr>
-            <td><div class="stat-name">Matched (with a comparable price)</div><div class="stat-desc">Match-key present in both files with valid numeric values.</div></td>
-            <td class="stat-count">${o.matched.toLocaleString()}</td>
-            <td style="text-align:right;color:var(--muted);font-size:12px;">See buckets in the matrix</td>
-          </tr>
-          <tr class="${o.dropped ? 'clickable' : ''}" data-action="dropped">
-            <td><div class="stat-name">Dropped</div><div class="stat-desc">Match-key in PREVIOUS, NOT in NEW — de-listed, key changed, or matching error.</div></td>
-            <td class="stat-count">${o.dropped.toLocaleString()}</td>
-            <td style="text-align:right;">${o.dropped ? 'View SKUs →' : '—'}</td>
-          </tr>
-          <tr class="${o.new ? 'clickable' : ''}" data-action="new">
-            <td><div class="stat-name">New</div><div class="stat-desc">Match-key in NEW, NOT in PREVIOUS — newly listed or feed-format change.</div></td>
-            <td class="stat-count">${o.new.toLocaleString()}</td>
-            <td style="text-align:right;">${o.new ? 'View SKUs →' : '—'}</td>
-          </tr>
-          <tr class="${o.missing ? 'clickable' : ''}" data-action="missing">
-            <td><div class="stat-name">Missing value</div><div class="stat-desc">Present in both files, but ${escapeHtml(d.cmpCol)} is empty / non-numeric in one of them.</div></td>
-            <td class="stat-count">${o.missing.toLocaleString()}</td>
-            <td style="text-align:right;">${o.missing ? 'View SKUs →' : '—'}</td>
-          </tr>
-          <tr>
-            <td><div class="stat-name">In previous file</div><div class="stat-desc">Distinct match-keys for this group in the previous file.</div></td>
-            <td class="stat-count dim">${o.inPrev.toLocaleString()}</td>
-            <td></td>
-          </tr>
-          <tr>
-            <td><div class="stat-name">In new file</div><div class="stat-desc">Distinct match-keys for this group in the new file.</div></td>
-            <td class="stat-count dim">${o.inNew.toLocaleString()}</td>
-            <td></td>
-          </tr>
-          <tr>
-            <td><div class="stat-name">Δ rows</div><div class="stat-desc">(In new) − (In previous). Positive = group grew, negative = group shrank.</div></td>
-            <td class="stat-count ${dCls}">${dTxt}</td>
-            <td></td>
-          </tr>
-          <tr>
-            <td><div class="stat-name">Total distinct keys</div><div class="stat-desc">Union of keys across both files for this group.</div></td>
-            <td class="stat-count dim">${o.total.toLocaleString()}</td>
-            <td></td>
-          </tr>
-        </tbody>
-      </table>
+  // Build a row per compare column for this group
+  const rows = cmps.map(cmpCol => {
+    const g = state.results.results[cmpCol].groups.get(groupKey);
+    if (!g) return null;
+    const matched = g.counts.reduce((a, b) => a + b, 0);
+    const inPrev = matched + g.special.dropped + g.special.missing;
+    const inNew = matched + g.special.new + g.special.missing;
+    const dRows = inNew - inPrev;
+    const total = matched + g.special.dropped + g.special.new + g.special.missing;
+    return { cmpCol, matched, dropped: g.special.dropped, new: g.special.new, missing: g.special.missing, inPrev, inNew, dRows, total };
+  }).filter(Boolean);
+
+  let html = `<div style="padding:18px 4px 12px;">
+    <div style="margin-bottom:14px;color:var(--muted);font-size:13px;">
+      <b style="color:var(--ink);font-size:14px;">${escapeHtml(d.groupLabel)}</b> &nbsp;·&nbsp; overview across ${cmps.length} compare column${cmps.length > 1 ? 's' : ''}. Click any non-zero count to see the SKUs.
     </div>
-  `;
+    <div class="matrix-wrap"><table class="matrix">
+      <thead><tr>
+        <th class="row-head">Compare column</th>
+        <th>Matched <span class="help" title="Rows in both files with comparable numeric values. Bucket distribution is in the main matrix above.">?</span></th>
+        <th>Dropped <span class="help" title="Match-key in PREVIOUS, NOT in NEW. De-listed, key changed, or matching error.">?</span></th>
+        <th>New <span class="help" title="Match-key in NEW, NOT in PREVIOUS. Newly listed or feed-format change.">?</span></th>
+        <th>Missing <span class="help" title="Present in both files but the value is empty / non-numeric in one of them.">?</span></th>
+        <th>In previous <span class="help" title="Distinct match-keys for this group in the previous file.">?</span></th>
+        <th>In new <span class="help" title="Distinct match-keys for this group in the new file.">?</span></th>
+        <th>Δ rows <span class="help" title="(In new) − (In previous). Positive = group grew; negative = shrank.">?</span></th>
+        <th>Total <span class="help" title="Union of distinct keys across both files for this group.">?</span></th>
+      </tr></thead>
+      <tbody>`;
+
+  for (const r of rows) {
+    const dCls = r.dRows > 0 ? 'delta-pos' : r.dRows < 0 ? 'delta-neg' : 'delta-zero';
+    const dTxt = (r.dRows > 0 ? '+' : '') + r.dRows.toLocaleString();
+    const matchedCell = r.matched
+      ? `<td class="cell matched-cell" data-cmpcol="${escapeAttr(r.cmpCol)}" data-action="matched">${r.matched.toLocaleString()}</td>`
+      : `<td class="empty">·</td>`;
+    const droppedCell = r.dropped
+      ? `<td class="cell special" data-cmpcol="${escapeAttr(r.cmpCol)}" data-action="dropped">${r.dropped.toLocaleString()}</td>`
+      : `<td class="empty">·</td>`;
+    const newCell = r.new
+      ? `<td class="cell special" data-cmpcol="${escapeAttr(r.cmpCol)}" data-action="new">${r.new.toLocaleString()}</td>`
+      : `<td class="empty">·</td>`;
+    const missingCell = r.missing
+      ? `<td class="cell special" data-cmpcol="${escapeAttr(r.cmpCol)}" data-action="missing">${r.missing.toLocaleString()}</td>`
+      : `<td class="empty">·</td>`;
+
+    html += `<tr>
+      <td class="row-head">${escapeHtml(r.cmpCol)}</td>
+      ${matchedCell}
+      ${droppedCell}
+      ${newCell}
+      ${missingCell}
+      <td>${r.inPrev.toLocaleString()}</td>
+      <td>${r.inNew.toLocaleString()}</td>
+      <td class="${dCls}">${dTxt}</td>
+      <td class="total">${r.total.toLocaleString()}</td>
+    </tr>`;
+  }
+  html += `</tbody></table></div></div>`;
+
   $('#drawer-body').innerHTML = html;
-  $$('#drawer-body tr.clickable').forEach(tr => tr.addEventListener('click', () => {
-    openRowsView(d.cmpCol, d.groupKey, { special: tr.dataset.action }, true);
+  $$('#drawer-body td.cell').forEach(td => td.addEventListener('click', () => {
+    const cmpCol = td.dataset.cmpcol;
+    const action = td.dataset.action;
+    if (action === 'matched') openRowsView(cmpCol, d.groupKey, { matchedAll: true }, true);
+    else openRowsView(cmpCol, d.groupKey, { special: action }, true);
   }));
 }
 
@@ -1336,7 +1356,12 @@ function openRowsView(cmpCol, groupKey, scope, cameFromOverview) {
   const g = state.results.results[cmpCol].groups.get(groupKey);
   if (!g) return;
   let rows, title, kind, bucketIdx = null;
-  if (scope.bucket != null) {
+  if (scope.matchedAll) {
+    kind = 'matchedAll';
+    rows = [];
+    Object.values(g.rows).forEach(arr => rows.push(...arr));
+    title = `${cmpCol} — all matched rows`;
+  } else if (scope.bucket != null) {
     kind = 'bucket'; bucketIdx = scope.bucket;
     rows = g.rows[bucketIdx] || [];
     title = `${cmpCol} — ${bucketLabels(state.results.edges)[bucketIdx]}`;
@@ -1382,7 +1407,7 @@ function buildDrawerColumns(d) {
   if (p.showPrevValue) cols.push({ k: `${d.cmpCol} — previous`, type: 'val_prev', src: d.cmpCol });
   if (p.showNewValue) cols.push({ k: `${d.cmpCol} — new`, type: 'val_new', src: d.cmpCol });
   // Δ % only meaningful when both values exist (bucket or missing rows)
-  if (p.showDeltaPct && (d.kind === 'bucket' || d.kind === 'missing')) cols.push({ k: 'Δ %', type: 'd_pct' });
+  if (p.showDeltaPct && (d.kind === 'bucket' || d.kind === 'missing' || d.kind === 'matchedAll')) cols.push({ k: 'Δ %', type: 'd_pct' });
   // Reserved cols set: dedupe extras
   const reserved = new Set([...state.results.matchKeys, ...state.results.groupByCols, d.cmpCol]);
   p.extras.forEach(c => { if (!reserved.has(c)) cols.push({ k: c, type: 'extra' }); });
