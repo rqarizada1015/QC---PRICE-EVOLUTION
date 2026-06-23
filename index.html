@@ -2,29 +2,18 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<title>QC — Price Evolution</title>
+<title>QC — Price Evolution &amp; Variance</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <style>
   :root {
-    --bg: #f4f6fa;
-    --panel: #ffffff;
-    --ink: #1a2740;
-    --muted: #6a7790;
-    --line: #e3e7ef;
-    --line-strong: #c8d0de;
-    --accent: #1f3a8a;
-    --accent-soft: #e7ecf8;
-    --accent-hover: #18306e;
-    --green: #22a06b;
-    --green-bg: #1fa97a;
-    --yellow: #fff7c2;
-    --orange: #f4a52a;
-    --pink: #f6c7c7;
-    --red: #e07b7b;
-    --red-strong: #c84a4a;
-    --gray-bg: #d5dbe6;
+    --bg: #f4f6fa; --panel: #ffffff; --ink: #1a2740; --muted: #6a7790;
+    --line: #e3e7ef; --line-strong: #c8d0de;
+    --accent: #1f3a8a; --accent-soft: #e7ecf8; --accent-hover: #18306e;
+    --green: #22a06b; --green-bg: #1fa97a;
+    --yellow: #fff7c2; --orange: #f4a52a; --pink: #f6c7c7;
+    --red: #e07b7b; --red-strong: #c84a4a; --gray-bg: #d5dbe6;
   }
   * { box-sizing: border-box; }
   html, body { margin: 0; padding: 0; background: var(--bg); color: var(--ink); font-family: -apple-system, "Segoe UI", Roboto, Arial, sans-serif; font-size: 14px; }
@@ -63,8 +52,9 @@
 
   label.field { display: block; margin-bottom: 14px; }
   label.field .lbl, .lbl { display: block; font-size: 12px; color: var(--muted); margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.4px; font-weight: 600; }
-  input[type="text"], input[type="number"], select, textarea { width: 100%; padding: 8px 10px; border: 1px solid var(--line); border-radius: 6px; font-size: 13px; background: white; color: var(--ink); }
-  input[type="text"]:focus, select:focus, input[type="number"]:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+  input[type="text"], input[type="number"], select, textarea { width: 100%; padding: 8px 10px; border: 1px solid var(--line); border-radius: 6px; font-size: 13px; background: white; color: var(--ink); font-family: inherit; }
+  textarea { resize: vertical; min-height: 80px; font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 12px; }
+  input[type="text"]:focus, select:focus, input[type="number"]:focus, textarea:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
 
   .btn { background: var(--accent); color: white; border: none; padding: 10px 22px; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: 600; letter-spacing: 0.3px; }
   .btn:hover { background: var(--accent-hover); }
@@ -74,8 +64,6 @@
   .btn.small { padding: 5px 12px; font-size: 12px; }
   .btn.ghost { background: transparent; color: var(--muted); border: 1px dashed var(--line-strong); }
   .btn.ghost:hover { background: var(--accent-soft); color: var(--accent); border-color: var(--accent); }
-  .btn.danger { background: white; color: var(--red-strong); border: 1px solid var(--red); }
-  .btn.danger:hover { background: #fdf3f3; }
 
   .upload-bar { display: flex; gap: 14px; align-items: center; flex-wrap: wrap; padding: 18px 20px; background: var(--accent-soft); border: 1px dashed var(--accent); border-radius: 10px; }
   .upload-bar.drag { background: #d6e0f5; border-style: solid; }
@@ -89,11 +77,15 @@
   .file-card { background: white; border: 1px solid var(--line); border-radius: 8px; padding: 12px 14px; display: flex; flex-direction: column; gap: 4px; position: relative; }
   .file-card.is-prev { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-soft); }
   .file-card.is-new { border-color: var(--green); box-shadow: 0 0 0 2px #d8f0e4; }
+  .file-card.is-source { border-color: #b069c0; box-shadow: 0 0 0 2px #f3e6f5; }
+  .file-card.is-sql { background: linear-gradient(180deg, #fffdf3 0%, #ffffff 60%); }
   .file-card .name { font-weight: 600; word-break: break-all; }
   .file-card .meta { color: var(--muted); font-size: 12px; }
   .file-card .tags { display: flex; gap: 6px; margin-top: 6px; flex-wrap: wrap; }
   .file-card .tags .tag { font-size: 11px; padding: 2px 8px; border-radius: 10px; background: var(--accent-soft); color: var(--accent); font-weight: 600; }
   .file-card .tags .tag.new { background: #d8f0e4; color: var(--green); }
+  .file-card .tags .tag.source { background: #f3e6f5; color: #823693; }
+  .file-card .tags .tag.kind-sql { background: #fff3cf; color: #8a5a08; }
   .file-card .x { position: absolute; top: 6px; right: 8px; background: transparent; border: none; color: var(--muted); cursor: pointer; font-size: 16px; padding: 2px 6px; border-radius: 4px; }
   .file-card .x:hover { background: #fdf3f3; color: var(--red-strong); }
 
@@ -103,10 +95,34 @@
   .file-pick-box .row { gap: 14px; align-items: flex-end; }
   .file-pick-box .field { margin: 0; }
 
+  /* SQL panel */
+  .sql-panel { margin-top: 18px; padding: 16px 18px; background: #fffbe8; border: 1px solid #ffe082; border-radius: 8px; }
+  .sql-panel.disconnected { background: #fff7e6; border-color: #ffd599; }
+  .sql-panel.collapsed { padding: 10px 14px; }
+  .sql-panel.collapsed .sql-body { display: none; }
+  .sql-panel h4 { margin: 0 0 4px; font-size: 13px; text-transform: uppercase; letter-spacing: 0.4px; color: #8a5a08; display: flex; align-items: center; gap: 10px; cursor: pointer; user-select: none; }
+  .sql-panel.collapsed h4 { margin: 0; }
+  .sql-panel h4 .sql-chev { display: inline-block; transition: 0.18s; font-size: 11px; color: #8a5a08; }
+  .sql-panel:not(.collapsed) h4 .sql-chev { transform: rotate(90deg); }
+  .sql-panel h4 .sql-toggle-btn { margin-left: auto; background: white; border: 1px solid #ffd599; color: #8a5a08; padding: 3px 10px; border-radius: 4px; font-size: 11px; font-weight: 600; cursor: pointer; text-transform: none; letter-spacing: 0; }
+  .sql-panel h4 .sql-toggle-btn:hover { background: #fff3cf; }
+  .sql-panel h4 .status-dot { width: 9px; height: 9px; border-radius: 50%; display: inline-block; }
+  .sql-panel h4 .status-dot.ok { background: var(--green); }
+  .sql-panel h4 .status-dot.off { background: var(--red); }
+  .sql-panel .hint { color: var(--muted); font-size: 12px; margin-bottom: 10px; }
+  .sql-panel pre { background: white; padding: 8px 12px; border-radius: 4px; font-size: 12px; margin: 6px 0; overflow-x: auto; }
+  .sql-row { display: flex; gap: 10px; align-items: flex-end; }
+  .sql-row .plat { flex: 0 0 160px; }
+  .sql-row .sql { flex: 1; }
+  .sql-status { margin-top: 6px; font-size: 12px; color: var(--muted); }
+  .sql-status.err { color: var(--red-strong); }
+  .sql-status.ok { color: var(--green); }
+
   .parse-panel { border: 1px solid var(--line); border-radius: 8px; padding: 14px 16px; background: #fafbfd; margin-bottom: 10px; }
   .parse-panel h4 { margin: 0 0 8px; font-size: 13px; display: flex; align-items: center; gap: 8px; }
   .parse-panel h4 .role-prev { background: var(--accent); color: white; padding: 2px 8px; border-radius: 10px; font-size: 10px; font-weight: 700; letter-spacing: 0.4px; }
   .parse-panel h4 .role-new { background: var(--green); color: white; padding: 2px 8px; border-radius: 10px; font-size: 10px; font-weight: 700; letter-spacing: 0.4px; }
+  .parse-panel h4 .role-src { background: #823693; color: white; padding: 2px 8px; border-radius: 10px; font-size: 10px; font-weight: 700; letter-spacing: 0.4px; }
   .preview-table { width: 100%; border-collapse: collapse; font-size: 11px; }
   .preview-table th, .preview-table td { padding: 4px 7px; border-bottom: 1px solid var(--line); text-align: left; white-space: nowrap; }
   .preview-table th { background: white; color: var(--muted); font-weight: 600; text-transform: uppercase; font-size: 10px; letter-spacing: 0.3px; position: sticky; top: 0; }
@@ -114,6 +130,7 @@
 
   .warn { background: #fff7e6; border-left: 3px solid var(--orange); padding: 10px 14px; border-radius: 4px; color: #8a5a08; font-size: 13px; margin-bottom: 14px; }
 
+  /* Multi-select */
   .ms { position: relative; }
   .ms-control { min-height: 38px; border: 1px solid var(--line); border-radius: 6px; background: white; padding: 4px 30px 4px 6px; display: flex; flex-wrap: wrap; gap: 4px; cursor: pointer; align-items: center; position: relative; }
   .ms-control:hover { border-color: var(--line-strong); }
@@ -148,6 +165,17 @@
   .help { display: inline-block; width: 14px; height: 14px; line-height: 14px; text-align: center; background: var(--muted); color: white; font-size: 10px; border-radius: 50%; cursor: help; margin-left: 4px; vertical-align: middle; }
   .help:hover { background: var(--accent); }
 
+  /* Mode tabs */
+  .mode-tabs { display: flex; gap: 0; margin-bottom: 18px; border-bottom: 2px solid var(--line); }
+  .mode-tab { padding: 10px 18px; cursor: pointer; font-size: 13px; font-weight: 600; color: var(--muted); border: none; background: transparent; border-bottom: 3px solid transparent; margin-bottom: -2px; transition: 0.12s; display: inline-flex; align-items: center; gap: 8px; }
+  .mode-tab:hover { color: var(--accent); }
+  .mode-tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+  .mode-tab .badge { background: var(--accent-soft); color: var(--accent); font-size: 10px; padding: 1px 7px; border-radius: 8px; font-weight: 700; }
+
+  .mode-section { display: none; }
+  .mode-section.active { display: block; }
+  .mode-section h3.cfg-heading { font-size: 13px; text-transform: uppercase; letter-spacing: 0.4px; color: var(--accent); margin: 0 0 12px; padding-bottom: 6px; border-bottom: 1px solid var(--line); }
+
   .counters { display: flex; gap: 14px; flex-wrap: wrap; margin-bottom: 16px; }
   .counter { background: white; border: 1px solid var(--line); border-radius: 6px; padding: 10px 14px; min-width: 130px; }
   .counter .label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.4px; }
@@ -160,10 +188,17 @@
   .results-toolbar .search::before { content: '🔍'; position: absolute; left: 8px; top: 50%; transform: translateY(-50%); font-size: 13px; opacity: 0.6; }
   .results-toolbar .sort-info { color: var(--muted); font-size: 12px; }
 
+  .results-section { margin-bottom: 32px; padding-bottom: 20px; border-bottom: 2px solid var(--line); }
+  .results-section:last-child { border-bottom: none; }
+  .results-section > .section-title { font-size: 16px; font-weight: 700; color: var(--ink); margin: 0 0 14px; display: flex; align-items: center; gap: 10px; }
+  .results-section > .section-title .badge { background: var(--accent); color: white; font-size: 11px; padding: 3px 10px; border-radius: 10px; font-weight: 600; letter-spacing: 0.3px; text-transform: uppercase; }
+  .results-section.variance > .section-title .badge { background: #823693; }
+
   .matrix-block { margin-bottom: 28px; }
   .matrix-block h3 { font-size: 14px; margin: 0 0 10px; font-weight: 600; color: var(--ink); }
   .matrix-block h3 .sub { color: var(--muted); font-weight: 400; }
   .matrix-block .vs-pill { display: inline-block; background: var(--accent-soft); color: var(--accent); padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; margin-right: 6px; }
+  .matrix-block .vs-pill.variance { background: #f3e6f5; color: #823693; }
   .matrix-wrap { overflow-x: auto; border-radius: 6px; border: 1px solid var(--line); background: white; }
   .matrix { border-collapse: collapse; width: 100%; font-size: 12px; }
   .matrix th { background: var(--accent); color: white; padding: 10px 8px; font-weight: 600; text-align: center; white-space: nowrap; font-size: 11px; letter-spacing: 0.3px; cursor: pointer; user-select: none; position: relative; }
@@ -203,7 +238,7 @@
   .drawer-sub { font-size: 12px; opacity: 0.8; }
   .drawer .close { background: rgba(255,255,255,0.18); border: none; color: white; width: 28px; height: 28px; border-radius: 4px; cursor: pointer; font-size: 16px; }
   .drawer-toolbar { padding: 10px 20px; border-bottom: 1px solid var(--line); display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
-  .drawer-toolbar .search { flex: 1; max-width: 360px; }
+  .drawer-toolbar .search { flex: 1; max-width: 320px; }
   .drawer .body { flex: 1; overflow: auto; padding: 0 20px 16px; }
   .drawer .footer { padding: 12px 20px; border-top: 1px solid var(--line); display: flex; justify-content: space-between; align-items: center; }
   .drawer .back-btn { background: transparent; border: 1px solid rgba(255,255,255,0.4); color: white; padding: 4px 10px; border-radius: 4px; font-size: 11px; cursor: pointer; margin-right: 10px; }
@@ -217,22 +252,6 @@
   .drawer td a { color: var(--accent); text-decoration: underline; }
   .drawer .pos { color: var(--green); font-weight: 600; }
   .drawer .neg { color: var(--red-strong); font-weight: 600; }
-
-  /* Group overview as a TABLE */
-  .overview-wrap { padding: 18px 4px; }
-  .overview-table { width: 100%; border-collapse: collapse; font-size: 13px; }
-  .overview-table th { background: var(--accent); color: white; padding: 10px 14px; text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: 0.4px; cursor: default; }
-  .overview-table td { padding: 12px 14px; border-bottom: 1px solid var(--line); }
-  .overview-table tr:last-child td { border-bottom: none; }
-  .overview-table tr.clickable { cursor: pointer; }
-  .overview-table tr.clickable:hover { background: var(--accent-soft); }
-  .overview-table tr.clickable td:last-child { color: var(--accent); font-weight: 600; }
-  .overview-table .stat-name { font-weight: 600; }
-  .overview-table .stat-desc { color: var(--muted); font-size: 12px; margin-top: 2px; }
-  .overview-table .stat-count { font-weight: 700; font-size: 16px; text-align: right; }
-  .overview-table .stat-count.pos { color: var(--green); }
-  .overview-table .stat-count.neg { color: var(--red-strong); }
-  .overview-table .stat-count.dim { color: var(--muted); }
 
   .hide { display: none !important; }
 
@@ -273,106 +292,212 @@
 </head>
 <body>
 <header class="main">
-  <h1>QC — Price Evolution</h1>
+  <h1>QC — Price Evolution &amp; Variance</h1>
   <div class="date" id="todayDate"></div>
 </header>
 <main>
 
   <div class="stepper" id="stepper">
-    <div class="pill" data-step="1"><span class="num">1</span> Upload &amp; pick files</div>
+    <div class="pill" data-step="1"><span class="num">1</span> Upload &amp; pick</div>
     <div class="pill" data-step="2"><span class="num">2</span> Parse settings</div>
-    <div class="pill" data-step="3"><span class="num">3</span> Map columns</div>
+    <div class="pill" data-step="3"><span class="num">3</span> Configure analysis</div>
     <div class="pill" data-step="4"><span class="num">4</span> Results</div>
   </div>
 
+  <!-- Step 1 -->
   <section class="step" id="step1" data-step="1">
     <div class="step-head">
       <span class="chev">▶</span>
-      <h2>1. Upload your feeds and pick old vs new</h2>
-      <span class="step-status" id="status1">No files yet</span>
+      <h2>1. Upload feeds (or run a SQL query) &amp; pick which to analyse</h2>
+      <span class="step-status" id="status1">No data yet</span>
     </div>
     <div class="step-body">
-      <div class="subtitle">Pick one or more files, then choose which one is the previous (older) snapshot and which is the new one. Files stay in your browser — nothing is uploaded anywhere.</div>
+      <div class="subtitle">Drop one or more files, or run a query against MySQL. The result of the query becomes a virtual file in the same pool.</div>
+
       <label class="upload-bar" id="dz">
-        <input type="file" id="file-input" accept=".csv,.tsv,.txt,.xlsx,.xls" multiple>
+        <input type="file" id="file-input" accept=".csv,.tsv,.txt,.xlsx,.xls,.json,.xml" multiple>
         <div class="ico">📂</div>
         <div class="txt">
-          <div class="big">Click here to choose files (or drop them anywhere on this box)</div>
-          <div class="small">.csv · .tsv · .txt · .xlsx · .xls — you can pick more than one at once</div>
+          <div class="big">Click to choose files (or drop them here)</div>
+          <div class="small">.csv · .tsv · .txt · .xlsx · .xls · .json · .xml</div>
         </div>
         <span class="btn">Choose files</span>
       </label>
+
+      <div class="sql-panel disconnected collapsed" id="sql-panel">
+        <h4 id="sql-panel-header">
+          <span class="sql-chev">▶</span>
+          <span class="status-dot off" id="bridge-dot"></span>SQL query <span id="bridge-label">— bridge not detected</span>
+          <button type="button" class="sql-toggle-btn" id="sql-toggle-btn">Show</button>
+        </h4>
+        <div class="sql-body">
+          <div id="sql-disconnected-body">
+            <div class="hint">To use SQL features, start the local Python bridge:</div>
+            <pre>cd "QC_PRICE_EVOLUTION"
+pip install pymysql      (one-time)
+start.bat                 (Windows)   OR   bash start.sh   (Mac/Linux)</pre>
+            <div class="hint">Then click <b>Check connection</b>. The bridge runs on <code>localhost:8765</code> and is never exposed beyond this machine.</div>
+            <button class="btn secondary small" id="check-bridge-btn">🔄 Check connection</button>
+          </div>
+          <div id="sql-connected-body" class="hide">
+            <div class="hint">Pick a platform (from <code>credentials.txt</code>), write a query, hit Run. The result lands in the pool below as a virtual file and behaves exactly like an uploaded CSV.</div>
+            <div class="sql-row">
+              <label class="field plat" style="margin:0;">
+                <span class="lbl">Platform</span>
+                <select id="sql-platform"></select>
+              </label>
+              <label class="field sql" style="margin:0;">
+                <span class="lbl">SQL query</span>
+                <textarea id="sql-text" placeholder="SELECT * FROM products LIMIT 1000"></textarea>
+              </label>
+            </div>
+            <div style="display:flex;gap:8px;margin-top:8px;align-items:center;">
+              <button class="btn" id="sql-run-btn">▶ Run query</button>
+              <button class="btn secondary small" id="check-bridge-btn-2">🔄 Re-check bridge</button>
+              <span class="sql-status" id="sql-status"></span>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <div class="file-pool" id="file-pool"></div>
 
       <div class="file-pick-box hide" id="file-pick">
-        <h4>Pick the two files to compare</h4>
-        <div class="hint">Pick which file is the previous snapshot and which is the new one. % change is computed as <code>(new − previous) / previous</code>.</div>
+        <h4>Pick which sources to analyse</h4>
+        <div class="hint">Pick previous + new for evolution. For variance only, pick the source file in the variance config (step 3).</div>
         <div class="row">
-          <label class="field" style="flex:1;min-width:240px;">
-            <span class="lbl">Previous (older) file</span>
-            <select id="prev-select"><option value="">— pick a file —</option></select>
+          <label class="field" style="flex:1;min-width:220px;">
+            <span class="lbl">Previous (older) — for evolution</span>
+            <select id="prev-select"><option value="">— pick a source —</option></select>
           </label>
-          <label class="field" style="flex:1;min-width:240px;">
-            <span class="lbl">New (recent) file</span>
-            <select id="new-select"><option value="">— pick a file —</option></select>
+          <label class="field" style="flex:1;min-width:220px;">
+            <span class="lbl">New (recent) — for evolution</span>
+            <select id="new-select"><option value="">— pick a source —</option></select>
           </label>
         </div>
       </div>
     </div>
   </section>
 
+  <!-- Step 2 -->
   <section class="step disabled collapsed" id="step2" data-step="2">
     <div class="step-head">
       <span class="chev">▶</span>
-      <h2>2. Check how each file is being read</h2>
+      <h2>2. Check how each source is being read</h2>
       <span class="step-status" id="status2">Pending</span>
     </div>
     <div class="step-body">
-      <div class="subtitle">Adjust delimiter / encoding / header row if needed. Each file shows one preview row — enough to confirm columns are reading correctly.</div>
+      <div class="subtitle">Adjust delimiter / encoding / header row if needed. Each source shows a one-row preview.</div>
       <div id="parse-panels"></div>
     </div>
   </section>
 
+  <!-- Step 3 -->
   <section class="step disabled collapsed" id="step3" data-step="3">
     <div class="step-head">
       <span class="chev">▶</span>
-      <h2>3. Map columns</h2>
+      <h2>3. Configure analysis</h2>
       <span class="step-status" id="status3">Pending</span>
     </div>
     <div class="step-body">
-      <div class="subtitle">All dropdowns let you search. They stay open until you click outside or press <kbd style="background:#f0f3f8;padding:0 4px;border-radius:3px;">Esc</kbd>.</div>
-      <div id="schema-warn"></div>
-      <div class="row">
-        <div class="col">
-          <label class="field">
-            <span class="lbl">Match key <span class="help" title="The unique identifier of a product. Rows in the two files are paired by this. Typical: SKU + Retailer.">?</span></span>
-            <div id="ms-matchKeys"></div>
-          </label>
-          <label class="field">
-            <span class="lbl">Group results by <span class="help" title="One row per unique combination of these column values. Pick zero for one global matrix, or pick e.g. Retailer.">?</span></span>
-            <div id="ms-groupBy"></div>
-          </label>
-        </div>
-        <div class="col">
-          <label class="field">
-            <span class="lbl">Columns to compare <span class="help" title="Pick which column(s) you want a % change distribution for. Click + to add more.">?</span></span>
-            <div id="cmp-list"></div>
-            <button class="btn ghost small" id="add-cmp">+ Add another column to compare</button>
-          </label>
-          <label class="field">
-            <span class="lbl">Bucket edges (% change, comma-separated)</span>
-            <input type="text" id="bucket-edges" value="-50,-30,-20,-10,-5,5,10,20,30,50,100">
-            <div class="lbl" style="text-transform:none;color:var(--muted);font-weight:400;margin-top:6px;">Produces N+1 buckets. The bucket containing 0 is the "stable" band.</div>
-          </label>
+      <div class="mode-tabs" id="mode-tabs">
+        <button class="mode-tab active" data-mode="evolution">📈 Price evolution <span class="badge">2 files</span></button>
+        <button class="mode-tab" data-mode="variance">📊 Price variance <span class="badge">1 source</span></button>
+        <button class="mode-tab" data-mode="both">🔗 Both</button>
+      </div>
+
+      <!-- Evolution config -->
+      <div class="mode-section active" id="cfg-evolution">
+        <h3 class="cfg-heading">Evolution: previous vs new</h3>
+        <div id="schema-warn"></div>
+        <div class="row">
+          <div class="col">
+            <label class="field">
+              <span class="lbl">Match key <span class="help" title="Unique identifier of a product. Rows in the two files are paired by this (e.g. SKU + Retailer).">?</span></span>
+              <div id="ms-matchKeys"></div>
+            </label>
+            <label class="field">
+              <span class="lbl">Group results by <span class="help" title="One row per unique combination. Pick zero for one global matrix, or pick e.g. Retailer.">?</span></span>
+              <div id="ms-groupBy"></div>
+            </label>
+          </div>
+          <div class="col">
+            <label class="field">
+              <span class="lbl">Columns to compare</span>
+              <div id="cmp-list"></div>
+              <button class="btn ghost small" id="add-cmp">+ Add another column to compare</button>
+            </label>
+            <label class="field">
+              <span class="lbl">Bucket edges (% change, comma-separated)</span>
+              <input type="text" id="bucket-edges" value="-50,-30,-20,-10,-5,5,10,20,30,50,100">
+            </label>
+          </div>
         </div>
       </div>
-      <div style="display:flex;gap:10px;margin-top:8px;">
-        <button class="btn" id="run-btn">Run analysis</button>
+
+      <!-- Variance config -->
+      <div class="mode-section" id="cfg-variance">
+        <h3 class="cfg-heading">Variance: each retailer's price vs the average per identifier</h3>
+        <div class="info-banner">For every unique <b>identifier value</b>, the tool computes the average price across the retailers you include. Each retailer's price is then compared to that average — output is a % variance distribution, just like evolution buckets. Currency is enforced strictly (same-currency-only).</div>
+        <div class="row">
+          <div class="col">
+            <label class="field">
+              <span class="lbl">Source <span class="help" title="One file (or SQL result) that contains a row per retailer × offer with prices.">?</span></span>
+              <select id="var-source"><option value="">— pick a source —</option></select>
+            </label>
+            <label class="field">
+              <span class="lbl">Identifier column <span class="help" title="The column that joins the same product across retailers. E.g. UPC, reference, normalised name.">?</span></span>
+              <select id="var-identifier"><option value="">— pick a column —</option></select>
+            </label>
+            <label class="field">
+              <span class="lbl">Retailer column</span>
+              <select id="var-retailer"><option value="">— pick a column —</option></select>
+            </label>
+            <label class="field">
+              <span class="lbl">Currency column (optional) <span class="help" title="If set, the average is computed within each currency only. If not set, all retailers are mixed together — pick the retailers in average manually.">?</span></span>
+              <select id="var-currency"><option value="">— none —</option></select>
+            </label>
+          </div>
+          <div class="col">
+            <label class="field">
+              <span class="lbl">Price column(s) to analyse</span>
+              <div id="var-cmp-list"></div>
+              <button class="btn ghost small" id="var-add-cmp">+ Add another price column</button>
+            </label>
+            <label class="field">
+              <span class="lbl">Group results by <span class="help" title="Rows of the variance matrix. Defaults to the retailer column.">?</span></span>
+              <div id="var-ms-groupBy"></div>
+            </label>
+            <label class="field">
+              <span class="lbl">Variance bucket edges (% from avg)</span>
+              <input type="text" id="var-bucket-edges" value="-50,-30,-20,-10,-5,5,10,20,30,50,100">
+            </label>
+          </div>
+        </div>
+        <div class="row" style="margin-top:8px;">
+          <div class="col">
+            <label class="field">
+              <span class="lbl">Retailers to INCLUDE in the average <span class="help" title="Only these retailers' prices contribute to the per-identifier average. Empty = all retailers.">?</span></span>
+              <div id="var-ms-included"></div>
+            </label>
+          </div>
+          <div class="col">
+            <label class="field">
+              <span class="lbl">Retailers to SHOW variance for <span class="help" title="The matrix shows variance only for these retailers (you might want avg from 5 but display variance for 8). Empty = all retailers.">?</span></span>
+              <div id="var-ms-displayed"></div>
+            </label>
+          </div>
+        </div>
+      </div>
+
+      <div style="display:flex;gap:10px;margin-top:18px;">
+        <button class="btn" id="run-btn">▶ Run analysis</button>
         <button class="btn secondary" id="reset-btn">Reset everything</button>
       </div>
     </div>
   </section>
 
+  <!-- Step 4 -->
   <section class="step disabled collapsed" id="step4" data-step="4">
     <div class="step-head">
       <span class="chev">▶</span>
@@ -381,18 +506,10 @@
     </div>
     <div class="step-body">
       <div class="warn hide" id="stale-banner" style="display:flex;align-items:center;gap:12px;justify-content:space-between;">
-        <span>⚠ The column mapping has changed since the last analysis. Re-run to refresh the matrix and the export.</span>
+        <span>⚠ The configuration has changed since the last run. Re-run to refresh.</span>
         <button class="btn small" id="rerun-btn">Re-run analysis</button>
       </div>
-      <div class="counters" id="counters"></div>
-      <div class="legend">
-        <span><span class="swatch" style="background:var(--green-bg)"></span> Stable (±5%)</span>
-        <span><span class="swatch" style="background:var(--yellow)"></span> Mild (±5–30%)</span>
-        <span><span class="swatch" style="background:var(--orange)"></span> Moderate (±30–50%)</span>
-        <span><span class="swatch" style="background:var(--pink)"></span> Strong (±50–100%)</span>
-        <span><span class="swatch" style="background:var(--red)"></span> Extreme (&gt;±100%)</span>
-        <span style="margin-left:14px;color:var(--accent);font-weight:600;">→ Click a group name (left column) to see Dropped / New / Missing / Δ rows.</span>
-      </div>
+
       <div class="results-toolbar">
         <div class="search">
           <input type="text" id="results-search" placeholder="Search rows (e.g. retailer name)…">
@@ -402,6 +519,7 @@
         <button class="btn secondary small" id="clear-sort">Clear sort</button>
         <button class="btn small" id="open-export">📤 Export to Excel</button>
       </div>
+
       <div id="results"></div>
     </div>
   </section>
@@ -425,6 +543,7 @@
       <input type="text" id="drawer-search" placeholder="Search within these rows…">
     </div>
     <button class="btn secondary small" id="customize-cols">⚙ Customize columns</button>
+    <button class="btn secondary small hide" id="chain-to-variance">▸ Run variance on these SKUs</button>
     <div style="flex:1"></div>
     <span class="drawer-sub" id="drawer-count"></span>
   </div>
@@ -453,44 +572,49 @@
 </div>
 
 <script>
-// ===========================================================================
+// ============================================================================
 // State
-// ===========================================================================
+// ============================================================================
 const state = {
-  pool: [],
+  pool: [],                       // unified: { id, file, parsed, kind: 'file'|'sql' }
   prevId: '', newId: '',
-  mapping: {
-    matchKeys: [],
-    groupByCols: [],
-    cmps: [''],
-    edges: [-50,-30,-20,-10,-5,5,10,20,30,50,100],
+  mode: 'evolution',              // 'evolution' | 'variance' | 'both'
+  bridge: { available: false, url: 'http://127.0.0.1:8765', platforms: [] },
+
+  evolution: {
+    matchKeys: [], groupByCols: [],
+    cmps: [''], edges: [-50,-30,-20,-10,-5,5,10,20,30,50,100],
+    results: null, lastRunFingerprint: null,
   },
-  results: null,
+  variance: {
+    sourceId: '',
+    identifierCol: '', retailerCol: '', currencyCol: '',
+    cmps: [''], groupByCols: [],
+    includedRetailers: [], displayedRetailers: [],
+    edges: [-50,-30,-20,-10,-5,5,10,20,30,50,100],
+    keyFilter: null,              // optional: { matchKeys, keys: Set<string> } from "Run variance on these SKUs"
+    results: null, lastRunFingerprint: null,
+  },
+
   resultsSort: { col: 'label', dir: 'asc' },
   resultsSearch: '',
   drawer: null,
   export: null,
 
-  // Persisted across drawer cells AND export modal
   columnPrefs: {
-    showMatchKeys: true,
-    showGroupBys: true,
-    showPrevValue: true,    // previous value of cmpCol
-    showNewValue: true,     // new value of cmpCol (= cmpCol from new file)
-    showDeltaPct: true,
-    showRowType: false,     // export-only built-in (default OFF — user said they don't need it)
-    showBucket: false,      // export-only built-in (default OFF)
-    extras: [],             // ordered list of feed column names (beyond reserved)
+    showMatchKeys: true, showGroupBys: true,
+    showPrevValue: true, showNewValue: true, showDeltaPct: true,
+    showRowType: false, showBucket: false,
+    extras: [],
   },
-  lastRunFingerprint: null, // snapshot of mapping when runAnalysis last ran
 };
 
 const $ = (s) => document.querySelector(s);
 const $$ = (s) => Array.from(document.querySelectorAll(s));
 
-// ===========================================================================
+// ============================================================================
 // Init
-// ===========================================================================
+// ============================================================================
 (function init() {
   $('#todayDate').textContent = new Date().toLocaleDateString(undefined, { year:'numeric', month:'long', day:'numeric' });
   setupDropzone();
@@ -498,23 +622,26 @@ const $$ = (s) => Array.from(document.querySelectorAll(s));
   $('#new-select').addEventListener('change', e => { state.newId = e.target.value; afterPickChange(); });
   $('#run-btn').addEventListener('click', runAnalysis);
   $('#reset-btn').addEventListener('click', () => location.reload());
-  $('#add-cmp').addEventListener('click', () => { state.mapping.cmps.push(''); renderCmpList(); });
-  $('#bucket-edges').addEventListener('change', captureMapping);
+  $('#rerun-btn').addEventListener('click', () => runAnalysis());
+  $('#add-cmp').addEventListener('click', () => { state.evolution.cmps.push(''); renderCmpList(); });
+  $('#var-add-cmp').addEventListener('click', () => { state.variance.cmps.push(''); renderVarianceCmpList(); });
+  $('#bucket-edges').addEventListener('change', () => { captureEvolutionMapping(); onMappingChanged(); });
+  $('#var-bucket-edges').addEventListener('change', () => { captureVarianceMapping(); onMappingChanged(); });
   $('#drawer-close').addEventListener('click', closeDrawer);
   $('#drawer-bg').addEventListener('click', closeDrawer);
   $('#drawer-back').addEventListener('click', goBackToGroupOverview);
   $('#export-xlsx-drawer').addEventListener('click', exportDrawerXlsx);
+  $('#chain-to-variance').addEventListener('click', chainToVariance);
   $('#results-search').addEventListener('input', e => { state.resultsSearch = e.target.value.toLowerCase(); renderResults(); });
   $('#drawer-search').addEventListener('input', e => { if (state.drawer && state.drawer.mode === 'rows') { state.drawer.search = e.target.value.toLowerCase(); renderDrawerRows(); } });
   $('#clear-sort').addEventListener('click', () => { state.resultsSort = { col: null, dir: null }; renderResults(); });
   $('#customize-cols').addEventListener('click', openColumnPicker);
   $('#open-export').addEventListener('click', openExportModal);
-  $('#rerun-btn').addEventListener('click', () => runAnalysis());
   $('#export-close').addEventListener('click', closeExport);
   $('#export-cancel').addEventListener('click', closeExport);
   $('#export-go').addEventListener('click', runExportXlsx);
 
-  $$('.step-head').forEach(h => h.addEventListener('click', e => {
+  $$('.step-head').forEach(h => h.addEventListener('click', () => {
     const st = h.closest('.step');
     if (st.classList.contains('disabled')) return;
     st.classList.toggle('collapsed');
@@ -527,9 +654,30 @@ const $$ = (s) => Array.from(document.querySelectorAll(s));
     st.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }));
 
+  $$('.mode-tab').forEach(t => t.addEventListener('click', () => {
+    const m = t.dataset.mode;
+    state.mode = m;
+    $$('.mode-tab').forEach(x => x.classList.toggle('active', x.dataset.mode === m));
+    $$('.mode-section').forEach(s => s.classList.remove('active'));
+    if (m === 'evolution') $('#cfg-evolution').classList.add('active');
+    else if (m === 'variance') $('#cfg-variance').classList.add('active');
+    else { $('#cfg-evolution').classList.add('active'); $('#cfg-variance').classList.add('active'); }
+    updateStep3Status(); onMappingChanged();
+  }));
+
+  // SQL bridge
+  $('#check-bridge-btn').addEventListener('click', checkBridge);
+  $('#check-bridge-btn-2').addEventListener('click', checkBridge);
+  $('#sql-run-btn').addEventListener('click', runSqlQuery);
+  $('#sql-panel-header').addEventListener('click', e => {
+    if (e.target.closest('button') && e.target.id !== 'sql-toggle-btn') return;
+    toggleSqlPanel();
+  });
+
   document.addEventListener('click', onDocClick);
   document.addEventListener('keydown', e => { if (e.key === 'Escape') { closeAllMenus(); closeDrawer(); closePopover(); closeExport(); } });
   updateStepper();
+  checkBridge();
 })();
 
 function expandOnly(stepId) {
@@ -538,9 +686,145 @@ function expandOnly(stepId) {
   if (st) st.classList.remove('collapsed');
 }
 
-// ===========================================================================
+// ============================================================================
+// MySQL bridge
+// ============================================================================
+function toggleSqlPanel(forceState) {
+  const panel = $('#sql-panel');
+  const btn = $('#sql-toggle-btn');
+  const wasCollapsed = panel.classList.contains('collapsed');
+  const collapsed = forceState != null ? !forceState : !wasCollapsed;
+  panel.classList.toggle('collapsed', collapsed);
+  if (btn) btn.textContent = collapsed ? 'Show' : 'Hide';
+  // When the user opens the panel, re-check the bridge so the dropdown
+  // catches up if the bridge was started (or credentials fixed) after page load.
+  if (!collapsed && wasCollapsed) checkBridge();
+}
+
+async function checkBridge() {
+  try {
+    const r = await fetch(state.bridge.url + '/health', { signal: AbortSignal.timeout(1500) });
+    if (!r.ok) throw new Error('not ok');
+    const data = await r.json();
+    state.bridge.available = true;
+    state.bridge.platforms = data.platforms || [];
+    state.bridge.credentialsPath = data.credentials_path || null;
+    state.bridge.credentialsError = data.credentials_error || null;
+    state.bridge.searchPaths = data.search_paths || [];
+    showBridgeConnected();
+  } catch (e) {
+    state.bridge.available = false;
+    showBridgeDisconnected();
+  }
+}
+
+function showBridgeConnected() {
+  $('#sql-panel').classList.remove('disconnected');
+  $('#bridge-dot').classList.remove('off'); $('#bridge-dot').classList.add('ok');
+  const n = state.bridge.platforms.length;
+  $('#bridge-label').textContent = `— bridge running · ${n} platform${n === 1 ? '' : 's'} loaded`;
+  $('#sql-disconnected-body').classList.add('hide');
+  $('#sql-connected-body').classList.remove('hide');
+  const sel = $('#sql-platform');
+  if (state.bridge.platforms.length === 0) {
+    sel.innerHTML = '<option value="" disabled selected>— no platforms loaded (check credentials.txt) —</option>';
+  } else {
+    sel.innerHTML = state.bridge.platforms.map(p => `<option value="${escapeAttr(p)}">${escapeHtml(p)}</option>`).join('');
+  }
+
+  // If credentials weren't found, surface where the bridge looked and what to do
+  let credsNote = $('#sql-creds-note');
+  if (!credsNote) {
+    credsNote = document.createElement('div');
+    credsNote.id = 'sql-creds-note';
+    credsNote.style.cssText = 'margin-top:10px;font-size:12px;';
+    $('#sql-connected-body').prepend(credsNote);
+  }
+  if (n === 0 || !state.bridge.credentialsPath) {
+    const tried = (state.bridge.searchPaths || []).map(t =>
+      `<li><code>${escapeHtml(t.path)}</code> <span style="color:var(--muted);">[${escapeHtml(t.source)}] — ${t.exists ? 'exists but unreadable' : 'not found'}</span></li>`
+    ).join('');
+    credsNote.innerHTML = `
+      <div class="warn" style="margin:0;">
+        <b>credentials.txt not loaded</b> — the dropdown is empty because the bridge couldn't find any platforms.<br>
+        ${state.bridge.credentialsError ? `<b>Error:</b> ${escapeHtml(state.bridge.credentialsError)}<br>` : ''}
+        <b>Tried (in order):</b><ul style="margin:6px 0 4px 18px;padding:0;">${tried}</ul>
+        <b>Fix it any of these ways:</b>
+        <ul style="margin:6px 0 0 18px;padding:0;">
+          <li>Copy <code>credentials.txt</code> into <code>QC_PRICE_EVOLUTION\\</code></li>
+          <li>OR launch with a path: <code>python mysql_bridge.py --credentials "C:\\Users\\ramiz\\Desktop\\Projects\\TEST_PYTHON\\credentials.txt"</code></li>
+          <li>OR set the env var: <code>set CREDENTIALS_PATH=...</code> and re-run <code>start.bat</code></li>
+        </ul>
+        Then click <b>🔄 Re-check bridge</b>.
+      </div>`;
+    credsNote.classList.remove('hide');
+  } else {
+    credsNote.innerHTML = `<div style="color:var(--muted);">Loaded credentials from: <code>${escapeHtml(state.bridge.credentialsPath)}</code></div>`;
+  }
+}
+function showBridgeDisconnected() {
+  $('#sql-panel').classList.add('disconnected');
+  $('#bridge-dot').classList.add('off'); $('#bridge-dot').classList.remove('ok');
+  $('#bridge-label').textContent = '— bridge not detected';
+  $('#sql-disconnected-body').classList.remove('hide');
+  $('#sql-connected-body').classList.add('hide');
+}
+
+async function runSqlQuery() {
+  const platform = $('#sql-platform').value;
+  const sql = $('#sql-text').value.trim();
+  if (!sql) { setSqlStatus('Empty query.', 'err'); return; }
+  setSqlStatus('Running…', '');
+  const btn = $('#sql-run-btn'); btn.disabled = true;
+  try {
+    const r = await fetch(state.bridge.url + '/query', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ platform, sql }),
+    });
+    const data = await r.json();
+    if (!r.ok) { setSqlStatus('Error: ' + (data.error || 'unknown'), 'err'); return; }
+    addSqlResultToPool(platform, sql, data);
+    setSqlStatus(`✓ ${data.rowcount.toLocaleString()} rows fetched, added to the pool.`, 'ok');
+  } catch (e) {
+    setSqlStatus('Bridge unreachable: ' + e.message, 'err');
+    state.bridge.available = false; showBridgeDisconnected();
+  } finally {
+    btn.disabled = false;
+  }
+}
+function setSqlStatus(msg, kind) {
+  const el = $('#sql-status');
+  el.textContent = msg;
+  el.className = 'sql-status' + (kind ? ' ' + kind : '');
+}
+
+function addSqlResultToPool(platform, sql, data) {
+  const id = 'sql_' + Math.random().toString(36).slice(2, 9);
+  const shortSql = sql.replace(/\s+/g, ' ').slice(0, 60);
+  const name = `SQL [${platform}] — ${shortSql}${sql.length > 60 ? '…' : ''}`;
+  // Coerce rows to plain string objects, columns in order
+  const rows = (data.rows || []).map(r => {
+    const obj = {};
+    for (const c of data.cols) obj[c] = (r[c] == null ? '' : String(r[c]));
+    return obj;
+  });
+  const entry = {
+    id,
+    file: { name, size: 0 },
+    parsed: { rows, cols: (data.cols || []).slice(), delimiter: 'sql', headerRow: 1, encoding: 'n/a', kind: 'sql' },
+    kind: 'sql',
+    sqlMeta: { platform, sql },
+  };
+  state.pool.push(entry);
+  autoPickFiles();
+  renderPool();
+  refreshAfterFilePick();
+  updateStepper();
+}
+
+// ============================================================================
 // Step 1: Upload + pick
-// ===========================================================================
+// ============================================================================
 function setupDropzone() {
   const dz = $('#dz'); const inp = $('#file-input');
   dz.addEventListener('dragover', e => { e.preventDefault(); dz.classList.add('drag'); });
@@ -560,21 +844,26 @@ async function handleFiles(fileList) {
 
 async function addFile(file) {
   const id = 'f_' + Math.random().toString(36).slice(2, 9);
-  const entry = { id, file, parsed: null };
+  const entry = { id, file, parsed: null, kind: 'file' };
   state.pool.push(entry);
-  await parseEntry(entry);
+  try {
+    await parseEntry(entry);
+  } catch (err) {
+    state.pool = state.pool.filter(e => e.id !== id);
+    alert(`Could not parse "${file.name}": ${err.message}`);
+  }
 }
 
 function autoPickFiles() {
   if (state.prevId && state.newId && state.prevId !== state.newId) return;
   const sorted = [...state.pool].sort((a,b) => {
-    const da = extractDateFromName(a.file.name);
-    const db = extractDateFromName(b.file.name);
+    const da = extractDateFromName(a.file.name); const db = extractDateFromName(b.file.name);
     if (da && db) return da - db;
     return a.file.name.localeCompare(b.file.name);
   });
   if (sorted.length >= 1 && !state.prevId) state.prevId = sorted[0].id;
   if (sorted.length >= 2 && !state.newId && sorted[sorted.length - 1].id !== state.prevId) state.newId = sorted[sorted.length - 1].id;
+  if (!state.variance.sourceId && state.pool.length) state.variance.sourceId = state.newId || sorted[sorted.length - 1].id || state.pool[0].id;
 }
 
 function extractDateFromName(name) {
@@ -590,6 +879,7 @@ function removeFile(id) {
   state.pool = state.pool.filter(e => e.id !== id);
   if (state.prevId === id) state.prevId = '';
   if (state.newId === id) state.newId = '';
+  if (state.variance.sourceId === id) state.variance.sourceId = '';
   autoPickFiles();
   renderPool();
   refreshAfterFilePick();
@@ -601,11 +891,15 @@ function renderPool() {
   for (const e of state.pool) {
     const card = document.createElement('div');
     card.className = 'file-card';
+    if (e.kind === 'sql') card.classList.add('is-sql');
     if (e.id === state.prevId) card.classList.add('is-prev');
     if (e.id === state.newId) card.classList.add('is-new');
+    if (e.id === state.variance.sourceId) card.classList.add('is-source');
     const tags = [];
+    if (e.kind === 'sql') tags.push('<span class="tag kind-sql">SQL</span>');
     if (e.id === state.prevId) tags.push('<span class="tag">PREVIOUS</span>');
     if (e.id === state.newId) tags.push('<span class="tag new">NEW</span>');
+    if (e.id === state.variance.sourceId) tags.push('<span class="tag source">VARIANCE SOURCE</span>');
     card.innerHTML = `
       <button class="x" title="Remove">×</button>
       <div class="name">${escapeHtml(e.file.name)}</div>
@@ -615,15 +909,15 @@ function renderPool() {
     card.querySelector('.x').addEventListener('click', () => removeFile(e.id));
     wrap.appendChild(card);
   }
-  $('#status1').textContent = state.pool.length ? `${state.pool.length} file(s) loaded` : 'No files yet';
-  $('#status1').classList.toggle('ok', !!(state.prevId && state.newId));
+  $('#status1').textContent = state.pool.length ? `${state.pool.length} source(s) loaded` : 'No data yet';
+  $('#status1').classList.toggle('ok', state.pool.length > 0);
 
   const pickBox = $('#file-pick');
   if (state.pool.length >= 1) {
     pickBox.classList.remove('hide');
     const opts = state.pool.map(e => `<option value="${e.id}">${escapeHtml(e.file.name)}</option>`).join('');
-    $('#prev-select').innerHTML = '<option value="">— pick a file —</option>' + opts;
-    $('#new-select').innerHTML = '<option value="">— pick a file —</option>' + opts;
+    $('#prev-select').innerHTML = '<option value="">— pick a source —</option>' + opts;
+    $('#new-select').innerHTML = '<option value="">— pick a source —</option>' + opts;
     $('#prev-select').value = state.prevId;
     $('#new-select').value = state.newId;
   } else {
@@ -638,15 +932,15 @@ function afterPickChange() {
 }
 
 function refreshAfterFilePick() {
-  const ok = state.prevId && state.newId && state.prevId !== state.newId;
-  if (ok) {
+  const havePool = state.pool.length > 0;
+  if (havePool) {
     $('#step2').classList.remove('disabled');
     $('#step3').classList.remove('disabled');
     renderParsePanels();
-    populateMapping();
+    populateEvolutionMapping();
+    populateVarianceMapping();
     $('#status2').textContent = 'Loaded';
     $('#status2').classList.add('ok');
-    expandOnly('step2');
   } else {
     $('#step2').classList.add('disabled');
     $('#step3').classList.add('disabled');
@@ -656,14 +950,20 @@ function refreshAfterFilePick() {
   }
 }
 
-// ===========================================================================
+// ============================================================================
 // Parsing
-// ===========================================================================
+// ============================================================================
 async function parseEntry(entry, opts = {}) {
+  if (entry.kind === 'sql') return; // already parsed
   const name = entry.file.name.toLowerCase();
-  const isExcel = name.endsWith('.xlsx') || name.endsWith('.xls');
-  if (isExcel) await parseExcel(entry, opts);
-  else await parseCsv(entry, opts);
+  if (name.endsWith('.json')) { await parseJson(entry, opts); return; }
+  if (name.endsWith('.xml'))  { await parseXml(entry, opts);  return; }
+  if (name.endsWith('.xlsx') || name.endsWith('.xls')) { await parseExcel(entry, opts); return; }
+  // .csv / .tsv / .txt — delimited by default, can switch to fixed-width via parse panel
+  const existing = entry.parsed || {};
+  const useFixed = opts.format === 'fixed-width' || (existing.kind === 'fixed-width' && opts.format !== 'delimited');
+  if (useFixed) await parseTxtFixedWidth(entry, opts);
+  else          await parseCsv(entry, opts);
 }
 
 async function parseExcel(entry, opts) {
@@ -685,11 +985,7 @@ async function parseExcel(entry, opts) {
     for (let k = 0; k < header.length; k++) obj[header[k] || ('col_' + (k+1))] = r[k] == null ? '' : String(r[k]);
     rows.push(obj);
   }
-  entry.parsed = {
-    rows, cols: header.map((h, k) => h || ('col_' + (k+1))),
-    delimiter: 'xlsx', headerRow, sheets: wb.SheetNames, sheetName,
-    encoding: 'n/a', kind: 'xlsx',
-  };
+  entry.parsed = { rows, cols: header.map((h, k) => h || ('col_' + (k+1))), delimiter: 'xlsx', headerRow, sheets: wb.SheetNames, sheetName, encoding: 'n/a', kind: 'xlsx' };
 }
 
 async function parseCsv(entry, opts) {
@@ -699,112 +995,356 @@ async function parseCsv(entry, opts) {
   const encoding = opts.encoding || existing.encoding || 'UTF-8';
   const text = await readText(entry.file, encoding);
   const sliced = headerRow > 1 ? skipLines(text, headerRow - 1) : text;
-  const parsed = Papa.parse(sliced, {
-    header: true, delimiter, skipEmptyLines: 'greedy',
-    transformHeader: h => (h == null ? '' : String(h).trim()),
-    dynamicTyping: false,
-  });
+  const parsed = Papa.parse(sliced, { header: true, delimiter, skipEmptyLines: 'greedy', transformHeader: h => (h == null ? '' : String(h).trim()), dynamicTyping: false });
   const detected = parsed.meta && parsed.meta.delimiter ? parsed.meta.delimiter : ',';
   const cols = (parsed.meta && parsed.meta.fields) ? parsed.meta.fields.slice() : [];
+  entry.parsed = { rows: parsed.data, cols, delimiter: detected, headerRow, encoding, kind: 'csv', delimiterUserSet: opts.delimiter != null && opts.delimiter !== '' };
+}
+function readText(file, encoding) { return new Promise((resolve, reject) => { const fr = new FileReader(); fr.onload = () => resolve(fr.result); fr.onerror = reject; fr.readAsText(file, encoding); }); }
+function skipLines(text, n) { let idx = 0; for (let i = 0; i < n; i++) { const nl = text.indexOf('\n', idx); if (nl === -1) return ''; idx = nl + 1; } return text.slice(idx); }
+
+// ----- JSON ---------------------------------------------------------------
+async function parseJson(entry, opts) {
+  const existing = entry.parsed || {};
+  const text = await readText(entry.file, 'UTF-8');
+  let data, isNdjson = false;
+  try {
+    data = JSON.parse(text);
+  } catch (e) {
+    const lines = text.split(/\r?\n/).filter(l => l.trim());
+    const parsed = [];
+    for (const ln of lines) { try { parsed.push(JSON.parse(ln)); } catch { /* skip */ } }
+    if (!parsed.length) throw new Error('Could not parse as JSON or NDJSON: ' + e.message);
+    data = parsed; isNdjson = true;
+  }
+
+  // Find every array-of-objects in the structure
+  const arrays = [];
+  function walk(node, path) {
+    if (Array.isArray(node)) {
+      if (node.length && node.some(it => it && typeof it === 'object' && !Array.isArray(it))) {
+        arrays.push({ path: path || '(top)', arr: node });
+      }
+      // also descend (rare: array of arrays of objects, or array of wrappers)
+      node.forEach((item, i) => { if (item && typeof item === 'object') walk(item, `${path}[${i}]`); });
+    } else if (node && typeof node === 'object') {
+      for (const k of Object.keys(node)) walk(node[k], path ? `${path}.${k}` : k);
+    }
+  }
+  walk(data, '');
+  // De-dup by reference + sort by length desc
+  const seen = new Set(), uniqArrays = [];
+  for (const a of arrays) { if (seen.has(a.arr)) continue; seen.add(a.arr); uniqArrays.push(a); }
+  uniqArrays.sort((a, b) => b.arr.length - a.arr.length);
+
+  if (!uniqArrays.length) throw new Error('No array of records found in this JSON.');
+
+  const wantedPath = opts.rowPath != null ? opts.rowPath : (existing.jsonRowPath && uniqArrays.find(a => a.path === existing.jsonRowPath) ? existing.jsonRowPath : uniqArrays[0].path);
+  const chosen = uniqArrays.find(a => a.path === wantedPath) || uniqArrays[0];
+
+  const rows = chosen.arr.map(o => (o && typeof o === 'object') ? flattenJsonObject(o) : { value: String(o) });
+  const colSet = new Set(); const cols = [];
+  for (const r of rows) for (const k of Object.keys(r)) if (!colSet.has(k)) { colSet.add(k); cols.push(k); }
+
   entry.parsed = {
-    rows: parsed.data, cols,
-    delimiter: detected, headerRow, encoding, kind: 'csv',
-    delimiterUserSet: opts.delimiter != null && opts.delimiter !== '',
+    rows, cols, delimiter: 'json', headerRow: 1, encoding: 'UTF-8',
+    kind: 'json',
+    jsonArrays: uniqArrays.map(a => ({ path: a.path, len: a.arr.length })),
+    jsonRowPath: chosen.path,
+    jsonIsNdjson: isNdjson,
   };
 }
 
-function readText(file, encoding) {
-  return new Promise((resolve, reject) => {
-    const fr = new FileReader();
-    fr.onload = () => resolve(fr.result);
-    fr.onerror = reject;
-    fr.readAsText(file, encoding);
-  });
-}
-
-function skipLines(text, n) {
-  let idx = 0;
-  for (let i = 0; i < n; i++) {
-    const nl = text.indexOf('\n', idx);
-    if (nl === -1) return '';
-    idx = nl + 1;
+function flattenJsonObject(obj, prefix) {
+  const out = {};
+  if (obj == null) return out;
+  for (const k of Object.keys(obj)) {
+    const v = obj[k];
+    const key = prefix ? `${prefix}.${k}` : k;
+    if (v == null) out[key] = '';
+    else if (Array.isArray(v)) {
+      // Stringify arrays so they don't blow up the column set
+      try { out[key] = JSON.stringify(v); } catch { out[key] = String(v); }
+    }
+    else if (typeof v === 'object') Object.assign(out, flattenJsonObject(v, key));
+    else out[key] = (typeof v === 'number' || typeof v === 'boolean') ? String(v) : String(v);
   }
-  return text.slice(idx);
+  return out;
 }
 
-// ===========================================================================
-// Parse panels (both files, 1 preview row each)
-// ===========================================================================
+// ----- XML ----------------------------------------------------------------
+async function parseXml(entry, opts) {
+  const existing = entry.parsed || {};
+  const text = await readText(entry.file, 'UTF-8');
+  const dom = new DOMParser().parseFromString(text, 'application/xml');
+  const err = dom.querySelector('parsererror');
+  if (err) throw new Error('XML parse error: ' + (err.textContent || '').slice(0, 200));
+
+  // Count every element tag (skip the root itself)
+  const counts = new Map();
+  function walk(node, depth) {
+    if (node.nodeType !== 1) return;
+    if (depth > 0) counts.set(node.tagName, (counts.get(node.tagName) || 0) + 1);
+    for (const ch of node.children) walk(ch, depth + 1);
+  }
+  walk(dom.documentElement, 0);
+
+  let candidates = Array.from(counts.entries())
+    .filter(([, n]) => n > 1)
+    .sort((a, b) => b[1] - a[1]);
+
+  if (!candidates.length) {
+    // Single-row file fallback: first child level of the root
+    const ch = dom.documentElement.children;
+    if (!ch.length) throw new Error('XML has no element children — nothing to parse.');
+    candidates = [[ch[0].tagName, ch.length]];
+  }
+
+  const wanted = opts.rowTag != null ? opts.rowTag : (existing.xmlRowTag && candidates.find(([t]) => t === existing.xmlRowTag) ? existing.xmlRowTag : candidates[0][0]);
+  const chosen = candidates.find(([t]) => t === wanted) ? wanted : candidates[0][0];
+
+  const rowEls = dom.getElementsByTagName(chosen);
+  const rows = [];
+  for (const el of rowEls) rows.push(xmlElementToRow(el));
+
+  const colSet = new Set(); const cols = [];
+  for (const r of rows) for (const k of Object.keys(r)) if (!colSet.has(k)) { colSet.add(k); cols.push(k); }
+
+  entry.parsed = {
+    rows, cols, delimiter: 'xml', headerRow: 1, encoding: 'UTF-8',
+    kind: 'xml',
+    xmlRowTag: chosen,
+    xmlCandidates: candidates.map(([t, n]) => ({ tag: t, count: n })),
+  };
+}
+
+function xmlElementToRow(el) {
+  const row = {};
+  for (const a of el.attributes) row[a.name] = a.value;
+  for (const ch of el.children) {
+    const key = ch.tagName;
+    if (ch.children.length === 0 && ch.attributes.length === 0) {
+      row[key] = (ch.textContent || '').trim();
+    } else {
+      // Nested: flatten attributes + children with dotted keys
+      const sub = xmlElementToRow(ch);
+      // If the nested element also has direct text content, expose it as `<key>._text`
+      const directText = (ch.children.length === 0 && ch.textContent) ? ch.textContent.trim() : '';
+      if (directText) sub._text = directText;
+      for (const sk of Object.keys(sub)) row[`${key}.${sk}`] = sub[sk];
+    }
+  }
+  return row;
+}
+
+// ----- Fixed-width TXT ----------------------------------------------------
+async function parseTxtFixedWidth(entry, opts) {
+  const existing = entry.parsed || {};
+  const headerRow = opts.headerRow != null ? opts.headerRow : (existing.headerRow || 1);
+  const encoding = opts.encoding || existing.encoding || 'UTF-8';
+  const widthsStr = opts.widths != null ? opts.widths : (existing.fixedWidthsStr || '');
+  const text = await readText(entry.file, encoding);
+  const lines = text.split(/\r?\n/);
+  const headerLine = lines[headerRow - 1] || '';
+
+  let starts;
+  if (widthsStr.trim()) {
+    const widths = widthsStr.split(',').map(s => parseInt(s.trim(), 10)).filter(n => Number.isFinite(n) && n > 0);
+    starts = [0];
+    let acc = 0;
+    for (let i = 0; i < widths.length - 1; i++) { acc += widths[i]; starts.push(acc); }
+  } else {
+    // Auto-detect: column starts where header has a non-ws char after a ws char
+    starts = [];
+    let prevWs = true;
+    for (let i = 0; i < headerLine.length; i++) {
+      const c = headerLine[i];
+      const isWs = (c === ' ' || c === '\t');
+      if (!isWs && prevWs) starts.push(i);
+      prevWs = isWs;
+    }
+    if (!starts.length) starts = [0];
+  }
+  const ends = starts.slice(1).concat([Number.POSITIVE_INFINITY]);
+
+  const cols = starts.map((s, i) => {
+    const e = ends[i] === Infinity ? headerLine.length : ends[i];
+    const name = headerLine.slice(s, e).trim();
+    return name || ('col_' + (i + 1));
+  });
+
+  const rows = [];
+  for (let i = headerRow; i < lines.length; i++) {
+    const ln = lines[i];
+    if (!ln.trim()) continue;
+    const r = {};
+    for (let j = 0; j < cols.length; j++) {
+      const s = starts[j];
+      const e = ends[j] === Infinity ? ln.length : ends[j];
+      r[cols[j]] = ln.slice(s, Math.max(s, e)).trim();
+    }
+    rows.push(r);
+  }
+
+  // Build a widths string for display (last column is "rest")
+  const widthsForDisplay = starts.map((s, i) => (ends[i] === Infinity ? '…' : String(ends[i] - s))).join(',');
+
+  entry.parsed = {
+    rows, cols, delimiter: 'fixed-width', headerRow, encoding,
+    kind: 'fixed-width',
+    fixedStarts: starts,
+    fixedWidthsStr: widthsStr.trim() || widthsForDisplay,
+    fixedAutoDetected: !widthsStr.trim(),
+  };
+}
+
+// ============================================================================
+// Parse panels
+// ============================================================================
 function renderParsePanels() {
   const wrap = $('#parse-panels'); wrap.innerHTML = '';
-  const prev = state.pool.find(e => e.id === state.prevId);
-  const next = state.pool.find(e => e.id === state.newId);
-  if (prev) wrap.appendChild(buildParsePanel(prev, 'prev'));
-  if (next) wrap.appendChild(buildParsePanel(next, 'new'));
+  for (const entry of state.pool) {
+    let role = 'src';
+    if (entry.id === state.prevId) role = 'prev';
+    else if (entry.id === state.newId) role = 'new';
+    wrap.appendChild(buildParsePanel(entry, role));
+  }
 }
 
 function buildParsePanel(entry, role) {
   const p = entry.parsed;
   const panel = document.createElement('div');
   panel.className = 'parse-panel';
-  const roleTag = role === 'prev' ? '<span class="role-prev">PREVIOUS</span>' : '<span class="role-new">NEW</span>';
+  const roleTag = role === 'prev' ? '<span class="role-prev">PREVIOUS</span>' : role === 'new' ? '<span class="role-new">NEW</span>' : '<span class="role-src">SOURCE</span>';
   const isCsv = p.kind === 'csv';
-  let html = `<h4>${roleTag} ${escapeHtml(entry.file.name)}</h4>
-    <div class="row" style="gap:10px;">`;
-  if (isCsv) {
-    html += `
-      <label class="field" style="flex:1;min-width:140px;">
-        <span class="lbl">Delimiter</span>
-        <select data-opt="delimiter">
-          <option value="" ${!p.delimiterUserSet ? 'selected' : ''}>Auto (${escapeHtml(JSON.stringify(p.delimiter))})</option>
-          <option value="," ${p.delimiterUserSet && p.delimiter === ',' ? 'selected' : ''}>Comma ,</option>
-          <option value=";" ${p.delimiterUserSet && p.delimiter === ';' ? 'selected' : ''}>Semicolon ;</option>
-          <option value="\t" ${p.delimiterUserSet && p.delimiter === '\t' ? 'selected' : ''}>Tab</option>
-          <option value="|" ${p.delimiterUserSet && p.delimiter === '|' ? 'selected' : ''}>Pipe |</option>
-        </select>
-      </label>
-      <label class="field" style="flex:1;min-width:140px;">
-        <span class="lbl">Encoding</span>
-        <select data-opt="encoding">
-          <option value="UTF-8" ${p.encoding === 'UTF-8' ? 'selected' : ''}>UTF-8</option>
-          <option value="ISO-8859-1" ${p.encoding === 'ISO-8859-1' ? 'selected' : ''}>ISO-8859-1</option>
-          <option value="windows-1252" ${p.encoding === 'windows-1252' ? 'selected' : ''}>Windows-1252</option>
-        </select>
-      </label>`;
-  } else {
-    html += `
-      <label class="field" style="flex:1;min-width:160px;">
-        <span class="lbl">Sheet</span>
-        <select data-opt="sheetName">
-          ${p.sheets.map(s => `<option value="${escapeAttr(s)}" ${s === p.sheetName ? 'selected' : ''}>${escapeHtml(s)}</option>`).join('')}
-        </select>
-      </label>`;
+  const isSql = entry.kind === 'sql';
+  const isJson = p.kind === 'json';
+  const isXml = p.kind === 'xml';
+  const isFixed = p.kind === 'fixed-width';
+  const isExcel = p.kind === 'xlsx';
+  const isTxtFile = !isSql && /\.txt$/i.test(entry.file.name);
+
+  let html = `<h4>${roleTag} ${escapeHtml(entry.file.name)} <span style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:0.3px;font-weight:600;margin-left:4px;">${escapeHtml(p.kind)}</span></h4>`;
+  if (!isSql) {
+    html += `<div class="row" style="gap:10px;">`;
+    if (isCsv) {
+      html += `
+        <label class="field" style="flex:1;min-width:140px;">
+          <span class="lbl">Delimiter</span>
+          <select data-opt="delimiter">
+            <option value="" ${!p.delimiterUserSet ? 'selected' : ''}>Auto (${escapeHtml(JSON.stringify(p.delimiter))})</option>
+            <option value="," ${p.delimiterUserSet && p.delimiter === ',' ? 'selected' : ''}>Comma ,</option>
+            <option value=";" ${p.delimiterUserSet && p.delimiter === ';' ? 'selected' : ''}>Semicolon ;</option>
+            <option value="\t" ${p.delimiterUserSet && p.delimiter === '\t' ? 'selected' : ''}>Tab</option>
+            <option value="|" ${p.delimiterUserSet && p.delimiter === '|' ? 'selected' : ''}>Pipe |</option>
+          </select>
+        </label>
+        <label class="field" style="flex:1;min-width:140px;">
+          <span class="lbl">Encoding</span>
+          <select data-opt="encoding">
+            <option value="UTF-8" ${p.encoding === 'UTF-8' ? 'selected' : ''}>UTF-8</option>
+            <option value="ISO-8859-1" ${p.encoding === 'ISO-8859-1' ? 'selected' : ''}>ISO-8859-1</option>
+            <option value="windows-1252" ${p.encoding === 'windows-1252' ? 'selected' : ''}>Windows-1252</option>
+          </select>
+        </label>`;
+    } else if (isExcel) {
+      html += `
+        <label class="field" style="flex:1;min-width:160px;">
+          <span class="lbl">Sheet</span>
+          <select data-opt="sheetName">
+            ${p.sheets.map(s => `<option value="${escapeAttr(s)}" ${s === p.sheetName ? 'selected' : ''}>${escapeHtml(s)}</option>`).join('')}
+          </select>
+        </label>`;
+    } else if (isJson) {
+      const arrs = p.jsonArrays || [];
+      html += `
+        <label class="field" style="flex:1;min-width:260px;">
+          <span class="lbl">Row array <span class="help" title="The JSON path of the array used as rows. The tool auto-picks the largest; override if it picked the wrong one.">?</span></span>
+          <select data-opt="rowPath">
+            ${arrs.map(a => `<option value="${escapeAttr(a.path)}" ${a.path === p.jsonRowPath ? 'selected' : ''}>${escapeHtml(a.path)} — ${a.len.toLocaleString()} row(s)</option>`).join('')}
+          </select>
+        </label>
+        ${p.jsonIsNdjson ? '<div class="warn" style="margin:0;flex:1;min-width:200px;">Parsed as <b>NDJSON</b> (one JSON object per line) — strict JSON parse failed.</div>' : ''}`;
+    } else if (isXml) {
+      const cands = p.xmlCandidates || [];
+      html += `
+        <label class="field" style="flex:1;min-width:260px;">
+          <span class="lbl">Row tag <span class="help" title="The XML element used as one row. The tool auto-picks the most-repeated tag.">?</span></span>
+          <select data-opt="rowTag">
+            ${cands.map(c => `<option value="${escapeAttr(c.tag)}" ${c.tag === p.xmlRowTag ? 'selected' : ''}>&lt;${escapeHtml(c.tag)}&gt; — ${c.count.toLocaleString()} occurrence(s)</option>`).join('')}
+          </select>
+        </label>`;
+    } else if (isFixed) {
+      html += `
+        <label class="field" style="flex:1;min-width:140px;">
+          <span class="lbl">Format</span>
+          <select data-opt="format">
+            <option value="delimited">Delimited (CSV)</option>
+            <option value="fixed-width" selected>Fixed-width</option>
+          </select>
+        </label>
+        <label class="field" style="flex:2;min-width:240px;">
+          <span class="lbl">Column widths <span class="help" title="Comma-separated character widths (e.g. 10,15,8,20). Empty = auto-detect from header row.">?</span></span>
+          <input type="text" data-opt="widths" value="${escapeAttr(p.fixedWidthsStr || '')}" placeholder="auto from header row">
+        </label>
+        <label class="field" style="flex:1;min-width:140px;">
+          <span class="lbl">Encoding</span>
+          <select data-opt="encoding">
+            <option value="UTF-8" ${p.encoding === 'UTF-8' ? 'selected' : ''}>UTF-8</option>
+            <option value="ISO-8859-1" ${p.encoding === 'ISO-8859-1' ? 'selected' : ''}>ISO-8859-1</option>
+            <option value="windows-1252" ${p.encoding === 'windows-1252' ? 'selected' : ''}>Windows-1252</option>
+          </select>
+        </label>`;
+    }
+    // CSV-from-TXT files: offer a switch to fixed-width
+    if (isCsv && isTxtFile) {
+      html += `
+        <label class="field" style="flex:1;min-width:140px;">
+          <span class="lbl">Format</span>
+          <select data-opt="format">
+            <option value="delimited" selected>Delimited (CSV)</option>
+            <option value="fixed-width">Fixed-width</option>
+          </select>
+        </label>`;
+    }
+    if (!isJson && !isXml) {
+      html += `
+        <label class="field" style="flex:0 0 110px;">
+          <span class="lbl">Header row</span>
+          <input type="number" min="1" value="${p.headerRow}" data-opt="headerRow">
+        </label>`;
+    }
+    html += `</div>`;
   }
+  const subInfo = isSql ? ' · from MySQL'
+    : isJson ? ` · JSON${p.jsonIsNdjson ? ' (NDJSON)' : ''} · row array: ${escapeHtml(p.jsonRowPath || '(top)')}`
+    : isXml ? ` · XML · row tag: <${escapeHtml(p.xmlRowTag || '')}>`
+    : isFixed ? ' · fixed-width' : '';
   html += `
-      <label class="field" style="flex:0 0 110px;">
-        <span class="lbl">Header row</span>
-        <input type="number" min="1" value="${p.headerRow}" data-opt="headerRow">
-      </label>
-    </div>
-    <div class="lbl" style="text-transform:none;color:var(--muted);font-weight:400;margin:4px 0;">${p.rows.length.toLocaleString()} rows · ${p.cols.length} columns</div>
+    <div class="lbl" style="text-transform:none;color:var(--muted);font-weight:400;margin:4px 0;">${p.rows.length.toLocaleString()} rows · ${p.cols.length} columns${subInfo}</div>
     <div class="preview-wrap">${buildPreviewTable(p)}</div>`;
   panel.innerHTML = html;
-  panel.querySelectorAll('[data-opt]').forEach(el => {
-    el.addEventListener('change', async () => {
-      const opt = el.dataset.opt;
-      const v = el.type === 'number' ? Number(el.value) : el.value;
-      const o = {}; o[opt] = v;
-      await parseEntry(entry, o);
-      renderParsePanels();
-      renderPool();
-      populateMapping();
+  if (!isSql) {
+    panel.querySelectorAll('[data-opt]').forEach(el => {
+      el.addEventListener('change', async () => {
+        const opt = el.dataset.opt;
+        const v = el.type === 'number' ? Number(el.value) : el.value;
+        const o = {}; o[opt] = v;
+        try {
+          await parseEntry(entry, o);
+        } catch (err) {
+          alert('Re-parse failed: ' + err.message);
+        }
+        renderParsePanels(); renderPool();
+        populateEvolutionMapping(); populateVarianceMapping();
+      });
     });
-  });
+  }
   return panel;
 }
 
 function buildPreviewTable(p) {
-  const rows = p.rows.slice(0, 1);                  // ONE preview row per file
+  const rows = p.rows.slice(0, 1);
   const cols = p.cols;
   let h = '<table class="preview-table"><thead><tr>';
   cols.forEach(c => { h += `<th>${escapeHtml(c)}</th>`; });
@@ -818,9 +1358,9 @@ function buildPreviewTable(p) {
   return h;
 }
 
-// ===========================================================================
-// Step 3: Mapping
-// ===========================================================================
+// ============================================================================
+// Step 3: Evolution mapping
+// ============================================================================
 function intersectCols() {
   if (!state.prevId || !state.newId) return [];
   const a = state.pool.find(e => e.id === state.prevId).parsed.cols;
@@ -828,8 +1368,15 @@ function intersectCols() {
   return a.filter(c => b.includes(c));
 }
 
-function populateMapping() {
-  if (!state.prevId || !state.newId) return;
+function populateEvolutionMapping() {
+  const ev = state.evolution;
+  if (!state.prevId || !state.newId) {
+    mountMultiSelect('#ms-matchKeys', [], [], sel => { ev.matchKeys = sel; updateStep3Status(); onMappingChanged(); }, '— pick previous and new first —');
+    mountMultiSelect('#ms-groupBy', [], [], sel => { ev.groupByCols = sel; updateStep3Status(); onMappingChanged(); }, '— pick previous and new first —');
+    renderCmpList();
+    $('#schema-warn').innerHTML = '';
+    return;
+  }
   const prevE = state.pool.find(e => e.id === state.prevId);
   const newE = state.pool.find(e => e.id === state.newId);
   const inter = intersectCols();
@@ -838,185 +1385,243 @@ function populateMapping() {
 
   let warn = '';
   if (onlyPrev.length || onlyNew.length) {
-    warn = `<div class="warn">The two files don't have exactly the same columns. Only columns in <b>both</b> are selectable (${inter.length}).
-      ${onlyPrev.length ? `<br><b>Only in previous:</b> ${onlyPrev.map(escapeHtml).join(', ')}` : ''}
-      ${onlyNew.length ? `<br><b>Only in new:</b> ${onlyNew.map(escapeHtml).join(', ')}` : ''}</div>`;
+    warn = `<div class="warn">The two sources don't have exactly the same columns. Only columns in <b>both</b> are selectable (${inter.length}).
+      ${onlyPrev.length ? `<br><b>Only in previous:</b> ${onlyPrev.slice(0, 50).map(escapeHtml).join(', ')}${onlyPrev.length > 50 ? '…' : ''}` : ''}
+      ${onlyNew.length ? `<br><b>Only in new:</b> ${onlyNew.slice(0, 50).map(escapeHtml).join(', ')}${onlyNew.length > 50 ? '…' : ''}` : ''}</div>`;
   }
   $('#schema-warn').innerHTML = warn;
 
-  state.mapping.matchKeys = state.mapping.matchKeys.filter(c => inter.includes(c));
-  state.mapping.groupByCols = state.mapping.groupByCols.filter(c => inter.includes(c));
-  state.mapping.cmps = state.mapping.cmps.map(c => inter.includes(c) ? c : '');
+  ev.matchKeys = ev.matchKeys.filter(c => inter.includes(c));
+  ev.groupByCols = ev.groupByCols.filter(c => inter.includes(c));
+  ev.cmps = ev.cmps.map(c => inter.includes(c) ? c : '');
 
-  mountMultiSelect('#ms-matchKeys', inter, state.mapping.matchKeys, sel => { state.mapping.matchKeys = sel; updateStep3Status(); onMappingChanged(); }, 'Click to pick one or more columns…');
-  mountMultiSelect('#ms-groupBy', inter, state.mapping.groupByCols, sel => { state.mapping.groupByCols = sel; updateStep3Status(); onMappingChanged(); }, 'Click to pick one or more columns (or none)…');
+  mountMultiSelect('#ms-matchKeys', inter, ev.matchKeys, sel => { ev.matchKeys = sel; updateStep3Status(); onMappingChanged(); }, 'Click to pick one or more columns…');
+  mountMultiSelect('#ms-groupBy', inter, ev.groupByCols, sel => { ev.groupByCols = sel; updateStep3Status(); onMappingChanged(); }, 'Click to pick one or more columns (or none)…');
   renderCmpList();
-  updateStep3Status();
-}
-
-function updateStep3Status() {
-  const ok = state.mapping.matchKeys.length > 0 && state.mapping.cmps.filter(Boolean).length > 0;
-  $('#status3').textContent = ok ? 'Ready' : 'Pending';
-  $('#status3').classList.toggle('ok', ok);
 }
 
 function renderCmpList() {
   const wrap = $('#cmp-list'); wrap.innerHTML = '';
   if (!state.prevId || !state.newId) return;
   const inter = intersectCols();
-  if (state.mapping.cmps.length === 0) state.mapping.cmps = [''];
-  state.mapping.cmps.forEach((selected, i) => {
-    const row = document.createElement('div');
-    row.className = 'cmp-row';
+  if (state.evolution.cmps.length === 0) state.evolution.cmps = [''];
+  state.evolution.cmps.forEach((selected, i) => {
+    const row = document.createElement('div'); row.className = 'cmp-row';
     const opts = inter.map(c => `<option value="${escapeAttr(c)}" ${c === selected ? 'selected' : ''}>${escapeHtml(c)}</option>`).join('');
-    row.innerHTML = `
-      <select data-i="${i}"><option value="">— pick a column to compare —</option>${opts}</select>
-      ${state.mapping.cmps.length > 1 ? `<button class="remove" data-rm="${i}" title="Remove">×</button>` : ''}
-    `;
-    row.querySelector('select').addEventListener('change', e => { state.mapping.cmps[i] = e.target.value; updateStep3Status(); onMappingChanged(); });
+    row.innerHTML = `<select data-i="${i}"><option value="">— pick a column —</option>${opts}</select>${state.evolution.cmps.length > 1 ? `<button class="remove" data-rm="${i}">×</button>` : ''}`;
+    row.querySelector('select').addEventListener('change', e => { state.evolution.cmps[i] = e.target.value; updateStep3Status(); onMappingChanged(); });
     const rm = row.querySelector('[data-rm]');
-    if (rm) rm.addEventListener('click', () => { state.mapping.cmps.splice(i, 1); renderCmpList(); updateStep3Status(); onMappingChanged(); });
+    if (rm) rm.addEventListener('click', () => { state.evolution.cmps.splice(i, 1); renderCmpList(); updateStep3Status(); onMappingChanged(); });
     wrap.appendChild(row);
   });
 }
 
-function captureMapping() {
+function captureEvolutionMapping() {
   const edges = $('#bucket-edges').value.split(',').map(s => Number(s.trim())).filter(n => Number.isFinite(n));
   edges.sort((a,b) => a-b);
-  state.mapping.edges = edges;
-  refreshStaleBanner();
+  state.evolution.edges = edges;
 }
 
-function mappingFingerprint() {
-  captureBucketEdges();
-  return JSON.stringify({
-    matchKeys: state.mapping.matchKeys,
-    groupByCols: state.mapping.groupByCols,
-    cmps: state.mapping.cmps.filter(Boolean),
-    edges: state.mapping.edges,
-    prevId: state.prevId,
-    newId: state.newId,
+// ============================================================================
+// Step 3: Variance mapping
+// ============================================================================
+function populateVarianceMapping() {
+  const v = state.variance;
+  const opts = state.pool.map(e => `<option value="${e.id}">${escapeHtml(e.file.name)}</option>`).join('');
+  $('#var-source').innerHTML = '<option value="">— pick a source —</option>' + opts;
+  if (v.sourceId && !state.pool.find(e => e.id === v.sourceId)) v.sourceId = '';
+  $('#var-source').value = v.sourceId;
+  $('#var-source').onchange = e => { v.sourceId = e.target.value; populateVarianceMapping(); onMappingChanged(); };
+
+  const src = state.pool.find(e => e.id === v.sourceId);
+  const cols = src ? src.parsed.cols : [];
+
+  // Single-select dropdowns
+  ['identifier', 'retailer', 'currency'].forEach(field => {
+    const id = `#var-${field}`;
+    const sel = $(id);
+    const cur = v[field + 'Col'];
+    if (cur && !cols.includes(cur)) v[field + 'Col'] = '';
+    const blank = field === 'currency' ? '— none —' : '— pick a column —';
+    sel.innerHTML = `<option value="">${blank}</option>` + cols.map(c => `<option value="${escapeAttr(c)}" ${c === v[field + 'Col'] ? 'selected' : ''}>${escapeHtml(c)}</option>`).join('');
+    sel.onchange = e => {
+      v[field + 'Col'] = e.target.value;
+      if (field === 'retailer') populateVarianceRetailers();
+      onMappingChanged();
+    };
+  });
+
+  // Group-by
+  v.groupByCols = v.groupByCols.filter(c => cols.includes(c));
+  mountMultiSelect('#var-ms-groupBy', cols, v.groupByCols, sel => { v.groupByCols = sel; updateStep3Status(); onMappingChanged(); }, 'Click to pick (defaults to retailer if empty)…');
+
+  // Compare list
+  v.cmps = v.cmps.map(c => cols.includes(c) ? c : '');
+  renderVarianceCmpList();
+
+  // Retailer multi-selects
+  populateVarianceRetailers();
+}
+
+function renderVarianceCmpList() {
+  const v = state.variance;
+  const wrap = $('#var-cmp-list'); wrap.innerHTML = '';
+  const src = state.pool.find(e => e.id === v.sourceId);
+  const cols = src ? src.parsed.cols : [];
+  if (v.cmps.length === 0) v.cmps = [''];
+  v.cmps.forEach((selected, i) => {
+    const row = document.createElement('div'); row.className = 'cmp-row';
+    const opts = cols.map(c => `<option value="${escapeAttr(c)}" ${c === selected ? 'selected' : ''}>${escapeHtml(c)}</option>`).join('');
+    row.innerHTML = `<select data-i="${i}"><option value="">— pick a price column —</option>${opts}</select>${v.cmps.length > 1 ? `<button class="remove" data-rm="${i}">×</button>` : ''}`;
+    row.querySelector('select').addEventListener('change', e => { v.cmps[i] = e.target.value; updateStep3Status(); onMappingChanged(); });
+    const rm = row.querySelector('[data-rm]');
+    if (rm) rm.addEventListener('click', () => { v.cmps.splice(i, 1); renderVarianceCmpList(); updateStep3Status(); onMappingChanged(); });
+    wrap.appendChild(row);
   });
 }
-function captureBucketEdges() {
-  const inp = $('#bucket-edges');
-  if (!inp) return;
-  const edges = inp.value.split(',').map(s => Number(s.trim())).filter(n => Number.isFinite(n));
+
+function populateVarianceRetailers() {
+  const v = state.variance;
+  const src = state.pool.find(e => e.id === v.sourceId);
+  if (!src || !v.retailerCol) {
+    mountMultiSelect('#var-ms-included', [], [], sel => { v.includedRetailers = sel; onMappingChanged(); }, '— pick retailer column first —');
+    mountMultiSelect('#var-ms-displayed', [], [], sel => { v.displayedRetailers = sel; onMappingChanged(); }, '— pick retailer column first —');
+    return;
+  }
+  const set = new Set();
+  for (const r of src.parsed.rows) {
+    const val = r[v.retailerCol];
+    if (val != null && String(val).trim()) set.add(String(val).trim());
+  }
+  const retailers = Array.from(set).sort();
+  v.includedRetailers = v.includedRetailers.filter(r => set.has(r));
+  v.displayedRetailers = v.displayedRetailers.filter(r => set.has(r));
+  mountMultiSelect('#var-ms-included', retailers, v.includedRetailers, sel => { v.includedRetailers = sel; onMappingChanged(); }, 'Empty = ALL retailers');
+  mountMultiSelect('#var-ms-displayed', retailers, v.displayedRetailers, sel => { v.displayedRetailers = sel; onMappingChanged(); }, 'Empty = ALL retailers');
+}
+
+function captureVarianceMapping() {
+  const edges = $('#var-bucket-edges').value.split(',').map(s => Number(s.trim())).filter(n => Number.isFinite(n));
   edges.sort((a,b) => a-b);
-  state.mapping.edges = edges;
+  state.variance.edges = edges;
+}
+
+function updateStep3Status() {
+  let ok = false;
+  if (state.mode === 'evolution' || state.mode === 'both') {
+    const e = state.evolution;
+    ok = !!(state.prevId && state.newId && e.matchKeys.length && e.cmps.filter(Boolean).length);
+  }
+  if (state.mode === 'variance') {
+    const v = state.variance;
+    ok = !!(v.sourceId && v.identifierCol && v.retailerCol && v.cmps.filter(Boolean).length);
+  }
+  if (state.mode === 'both') {
+    const v = state.variance;
+    ok = ok && !!(v.sourceId && v.identifierCol && v.retailerCol && v.cmps.filter(Boolean).length);
+  }
+  $('#status3').textContent = ok ? 'Ready' : 'Pending';
+  $('#status3').classList.toggle('ok', ok);
+}
+
+// ============================================================================
+// Mapping fingerprint (stale detection)
+// ============================================================================
+function mappingFingerprint() {
+  captureEvolutionMapping(); captureVarianceMapping();
+  return JSON.stringify({
+    mode: state.mode,
+    evolution: { prevId: state.prevId, newId: state.newId, matchKeys: state.evolution.matchKeys, groupByCols: state.evolution.groupByCols, cmps: state.evolution.cmps.filter(Boolean), edges: state.evolution.edges },
+    variance: { sourceId: state.variance.sourceId, identifierCol: state.variance.identifierCol, retailerCol: state.variance.retailerCol, currencyCol: state.variance.currencyCol, cmps: state.variance.cmps.filter(Boolean), groupByCols: state.variance.groupByCols, includedRetailers: state.variance.includedRetailers, displayedRetailers: state.variance.displayedRetailers, edges: state.variance.edges, keyFilter: state.variance.keyFilter ? Array.from(state.variance.keyFilter.keys).slice().sort() : null },
+  });
 }
 function isStale() {
-  return !!(state.results && state.lastRunFingerprint && state.lastRunFingerprint !== mappingFingerprint());
+  return !!((state.evolution.results || state.variance.results) && state._lastFp && state._lastFp !== mappingFingerprint());
 }
 function refreshStaleBanner() {
-  const b = $('#stale-banner');
-  if (!b) return;
+  const b = $('#stale-banner'); if (!b) return;
   b.classList.toggle('hide', !isStale());
 }
 function onMappingChanged() { refreshStaleBanner(); }
 
-// ===========================================================================
-// Multi-select dropdown
-// ===========================================================================
+// ============================================================================
+// Multi-select
+// ============================================================================
 function mountMultiSelect(selOrEl, options, selected, onChange, placeholder) {
   const host = typeof selOrEl === 'string' ? $(selOrEl) : selOrEl;
   host.innerHTML = '';
   const ms = document.createElement('div'); ms.className = 'ms';
-  ms.innerHTML = `
-    <div class="ms-control"></div>
-    <div class="ms-menu">
-      <div class="ms-search"><input type="text" placeholder="Type to filter…"></div>
-      <div class="ms-options"></div>
-      <div class="ms-actions">
-        <span><a data-act="all">Select all</a> · <a data-act="none">Clear</a></span>
-        <span class="done-btn" data-act="done">Done</span>
-      </div>
-    </div>
-  `;
+  ms.innerHTML = `<div class="ms-control"></div><div class="ms-menu"><div class="ms-search"><input type="text" placeholder="Type to filter…"></div><div class="ms-options"></div><div class="ms-actions"><span><a data-act="all">Select all</a> · <a data-act="none">Clear</a></span><span class="done-btn" data-act="done">Done</span></div></div>`;
   host.appendChild(ms);
-  const ctrl = ms.querySelector('.ms-control');
-  const menu = ms.querySelector('.ms-menu');
-  const optsBox = ms.querySelector('.ms-options');
-  const searchEl = ms.querySelector('.ms-search input');
+  const ctrl = ms.querySelector('.ms-control'), menu = ms.querySelector('.ms-menu'), optsBox = ms.querySelector('.ms-options'), searchEl = ms.querySelector('.ms-search input');
   const data = { options: options.slice(), selected: selected.slice(), placeholder, search: '' };
-
   menu.addEventListener('click', e => e.stopPropagation());
-
   function renderCtrl() {
     if (!data.selected.length) { ctrl.innerHTML = `<span class="ms-placeholder">${escapeHtml(data.placeholder)}</span>`; return; }
-    ctrl.innerHTML = data.selected.map((opt, i) =>
-      `<span class="ms-chip"><span class="num">${i+1}</span><span class="lbl-txt">${escapeHtml(opt)}</span><span class="x" data-rm="${escapeAttr(opt)}">×</span></span>`
-    ).join('');
-    ctrl.querySelectorAll('[data-rm]').forEach(x => x.addEventListener('click', ev => {
-      ev.stopPropagation();
-      const v = x.dataset.rm;
-      data.selected = data.selected.filter(s => s !== v);
-      onChange(data.selected.slice());
-      renderCtrl(); renderOpts();
-    }));
+    ctrl.innerHTML = data.selected.map((opt, i) => `<span class="ms-chip"><span class="num">${i+1}</span><span class="lbl-txt">${escapeHtml(opt)}</span><span class="x" data-rm="${escapeAttr(opt)}">×</span></span>`).join('');
+    ctrl.querySelectorAll('[data-rm]').forEach(x => x.addEventListener('click', ev => { ev.stopPropagation(); const v = x.dataset.rm; data.selected = data.selected.filter(s => s !== v); onChange(data.selected.slice()); renderCtrl(); renderOpts(); }));
   }
   function renderOpts() {
     const term = data.search;
     const filtered = data.options.filter(o => !term || o.toLowerCase().includes(term));
-    optsBox.innerHTML = filtered.map(opt => {
-      const sel = data.selected.includes(opt);
-      const order = sel ? data.selected.indexOf(opt) + 1 : '';
-      return `<div class="ms-option ${sel ? 'selected' : ''}" data-v="${escapeAttr(opt)}">
-        <span class="check">${sel ? '✓' : ''}</span><span>${escapeHtml(opt)}</span>
-        ${order ? `<span style="margin-left:auto;font-size:11px;color:var(--accent);">#${order}</span>` : ''}
-      </div>`;
-    }).join('') || '<div style="padding:14px;color:var(--muted);font-size:13px;text-align:center;">No matches.</div>';
-    optsBox.querySelectorAll('.ms-option').forEach(o => o.addEventListener('click', (ev) => {
-      ev.stopPropagation();
-      const v = o.dataset.v;
-      if (data.selected.includes(v)) data.selected = data.selected.filter(s => s !== v);
-      else data.selected.push(v);
-      onChange(data.selected.slice());
-      renderCtrl(); renderOpts();
-    }));
+    optsBox.innerHTML = filtered.map(opt => { const sel = data.selected.includes(opt); const order = sel ? data.selected.indexOf(opt) + 1 : ''; return `<div class="ms-option ${sel ? 'selected' : ''}" data-v="${escapeAttr(opt)}"><span class="check">${sel ? '✓' : ''}</span><span>${escapeHtml(opt)}</span>${order ? `<span style="margin-left:auto;font-size:11px;color:var(--accent);">#${order}</span>` : ''}</div>`; }).join('') || '<div style="padding:14px;color:var(--muted);font-size:13px;text-align:center;">No matches.</div>';
+    optsBox.querySelectorAll('.ms-option').forEach(o => o.addEventListener('click', (ev) => { ev.stopPropagation(); const v = o.dataset.v; if (data.selected.includes(v)) data.selected = data.selected.filter(s => s !== v); else data.selected.push(v); onChange(data.selected.slice()); renderCtrl(); renderOpts(); }));
   }
-  ctrl.addEventListener('click', e => {
-    e.stopPropagation();
-    const wasOpen = ms.classList.contains('open');
-    closeAllMenus(ms);
-    ms.classList.toggle('open', !wasOpen);
-    if (ms.classList.contains('open')) setTimeout(() => searchEl.focus(), 0);
-  });
+  ctrl.addEventListener('click', e => { e.stopPropagation(); const wasOpen = ms.classList.contains('open'); closeAllMenus(ms); ms.classList.toggle('open', !wasOpen); if (ms.classList.contains('open')) setTimeout(() => searchEl.focus(), 0); });
   searchEl.addEventListener('input', () => { data.search = searchEl.value.toLowerCase(); renderOpts(); });
   ms.querySelector('[data-act="all"]').addEventListener('click', e => { e.stopPropagation(); data.selected = data.options.slice(); onChange(data.selected.slice()); renderCtrl(); renderOpts(); });
   ms.querySelector('[data-act="none"]').addEventListener('click', e => { e.stopPropagation(); data.selected = []; onChange(data.selected.slice()); renderCtrl(); renderOpts(); });
   ms.querySelector('[data-act="done"]').addEventListener('click', e => { e.stopPropagation(); ms.classList.remove('open'); });
   renderCtrl(); renderOpts();
 }
-
-function closeAllMenus(except) {
-  $$('.ms.open').forEach(el => { if (el !== except) el.classList.remove('open'); });
-}
-function onDocClick(e) {
-  if (!e.target.closest('.ms')) closeAllMenus();
-  if (!e.target.closest('.popover') && !e.target.closest('#customize-cols')) closePopover();
-}
+function closeAllMenus(except) { $$('.ms.open').forEach(el => { if (el !== except) el.classList.remove('open'); }); }
+function onDocClick(e) { if (!e.target.closest('.ms')) closeAllMenus(); if (!e.target.closest('.popover') && !e.target.closest('#customize-cols')) closePopover(); }
 
 function updateStepper() {
-  const havePick = state.prevId && state.newId && state.prevId !== state.newId;
-  const haveResults = !!state.results;
+  const havePool = state.pool.length > 0;
+  const haveResults = !!(state.evolution.results || state.variance.results);
+  const ev = state.evolution;
+  const v = state.variance;
+  let mappingReady = false;
+  if (state.mode === 'evolution') mappingReady = !!(state.prevId && state.newId && ev.matchKeys.length && ev.cmps.filter(Boolean).length);
+  else if (state.mode === 'variance') mappingReady = !!(v.sourceId && v.identifierCol && v.retailerCol && v.cmps.filter(Boolean).length);
+  else mappingReady = !!(state.prevId && state.newId && ev.matchKeys.length && ev.cmps.filter(Boolean).length && v.sourceId && v.identifierCol && v.retailerCol && v.cmps.filter(Boolean).length);
   $$('#stepper .pill').forEach(p => p.classList.remove('active', 'done'));
-  if (!havePick) { $$('#stepper .pill')[0].classList.add('active'); }
-  else if (!haveResults) { $$('#stepper .pill')[0].classList.add('done'); $$('#stepper .pill')[1].classList.add('done'); $$('#stepper .pill')[2].classList.add('active'); }
+  if (!havePool) $$('#stepper .pill')[0].classList.add('active');
+  else if (!mappingReady) { $$('#stepper .pill')[0].classList.add('done'); $$('#stepper .pill')[1].classList.add('done'); $$('#stepper .pill')[2].classList.add('active'); }
+  else if (!haveResults) { $$('#stepper .pill').slice(0,3).forEach(p => p.classList.add('done')); $$('#stepper .pill')[2].classList.add('active'); }
   else { $$('#stepper .pill').forEach(p => p.classList.add('done')); $$('#stepper .pill')[3].classList.add('active'); }
 }
 
-// ===========================================================================
-// Analysis
-// ===========================================================================
+// ============================================================================
+// Analysis dispatcher
+// ============================================================================
 function runAnalysis() {
-  captureMapping();
-  const m = state.mapping;
-  if (!state.prevId || !state.newId) { alert('Pick previous and new files.'); return; }
-  if (m.matchKeys.length === 0) { alert('Pick at least one match-key column.'); return; }
+  captureEvolutionMapping(); captureVarianceMapping();
+  let okEvo = false, okVar = false;
+  if (state.mode === 'evolution' || state.mode === 'both') okEvo = runEvolution();
+  else state.evolution.results = null;
+  if (state.mode === 'variance' || state.mode === 'both') okVar = runVariance();
+  else state.variance.results = null;
+  if (!okEvo && !okVar) return;
+  state._lastFp = mappingFingerprint();
+  $('#step4').classList.remove('disabled');
+  $('#status4').textContent = 'Done';
+  $('#status4').classList.add('ok');
+  expandOnly('step4');
+  refreshStaleBanner();
+  renderResults();
+  document.getElementById('step4').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  updateStepper();
+}
+
+function runEvolution() {
+  const m = state.evolution;
+  if (!state.prevId || !state.newId) { alert('Pick previous and new files for the evolution analysis.'); return false; }
+  if (m.matchKeys.length === 0) { alert('Evolution: pick at least one match-key column.'); return false; }
   const cmps = m.cmps.filter(Boolean);
-  if (cmps.length === 0) { alert('Pick at least one column to compare.'); return; }
-  if (m.edges.length < 1) { alert('Bucket edges must contain at least one number.'); return; }
+  if (cmps.length === 0) { alert('Evolution: pick at least one column to compare.'); return false; }
+  if (m.edges.length < 1) { alert('Evolution: bucket edges must contain at least one number.'); return false; }
 
   const prevE = state.pool.find(e => e.id === state.prevId);
   const newE = state.pool.find(e => e.id === state.newId);
@@ -1058,37 +1663,137 @@ function runAnalysis() {
     }
   }
 
-  state.results = {
+  state.evolution.results = {
+    mode: 'evolution',
     results, summary, cmps, edges: m.edges,
     groupByCols: m.groupByCols.slice(),
     matchKeys: m.matchKeys.slice(),
     prevFileName: prevE.file.name, newFileName: newE.file.name,
     prevRowCount: prevRows.length, newRowCount: newRows.length,
   };
-  state.lastRunFingerprint = mappingFingerprint();
-  $('#step4').classList.remove('disabled');
-  $('#status4').textContent = 'Done';
-  $('#status4').classList.add('ok');
-  expandOnly('step4');
-  refreshStaleBanner();
-  renderResults();
-  document.getElementById('step4').scrollIntoView({ behavior: 'smooth', block: 'start' });
-  updateStepper();
+  state.evolution.lastRunFingerprint = mappingFingerprint();
+  return true;
+}
+
+function runVariance() {
+  const v = state.variance;
+  if (!v.sourceId) { alert('Variance: pick a source.'); return false; }
+  if (!v.identifierCol) { alert('Variance: pick an identifier column.'); return false; }
+  if (!v.retailerCol) { alert('Variance: pick a retailer column.'); return false; }
+  const cmps = v.cmps.filter(Boolean);
+  if (cmps.length === 0) { alert('Variance: pick at least one price column.'); return false; }
+  if (v.edges.length < 1) { alert('Variance: bucket edges must contain at least one number.'); return false; }
+
+  const src = state.pool.find(e => e.id === v.sourceId);
+  const allRows = src.parsed.rows;
+
+  // Default: groupBy = [retailerCol] if user picked none
+  const groupByCols = v.groupByCols.length ? v.groupByCols : [v.retailerCol];
+
+  // Optional pre-filter by keyFilter (from "Run variance on these SKUs")
+  let rows = allRows;
+  if (v.keyFilter && v.keyFilter.keys && v.keyFilter.keys.size) {
+    rows = rows.filter(r => v.keyFilter.keys.has(v.keyFilter.matchKeys.map(c => (r[c] || '').trim()).join('||')));
+  }
+
+  // Build averages per (identifier [, currency]) using INCLUDED retailers
+  const includedSet = v.includedRetailers.length ? new Set(v.includedRetailers) : null;
+  const displayedSet = v.displayedRetailers.length ? new Set(v.displayedRetailers) : null;
+
+  // Per cmpCol → per (id, currency) → list of {retailer, price, row}
+  const avgGroups = {}; // cmpCol -> Map<idKey, { id, currency, sum, n, retailers:Set }>
+  cmps.forEach(c => { avgGroups[c] = new Map(); });
+
+  for (const r of rows) {
+    const id = (r[v.identifierCol] || '').toString().trim();
+    if (!id) continue;
+    const retailer = (r[v.retailerCol] || '').toString().trim();
+    if (!retailer) continue;
+    if (includedSet && !includedSet.has(retailer)) continue;
+    const currency = v.currencyCol ? (r[v.currencyCol] || '').toString().trim() : '';
+    for (const cmpCol of cmps) {
+      const price = parseNumber(r[cmpCol]);
+      if (price == null) continue;
+      const idKey = v.currencyCol ? (id + '||' + currency) : id;
+      let g = avgGroups[cmpCol].get(idKey);
+      if (!g) { g = { id, currency, sum: 0, n: 0, retailers: new Set() }; avgGroups[cmpCol].set(idKey, g); }
+      g.sum += price; g.n += 1; g.retailers.add(retailer);
+    }
+  }
+
+  // Build results: per cmpCol → groupMap by groupBy, same shape as evolution
+  const results = {};
+  cmps.forEach(c => { results[c] = { groups: new Map() }; });
+  const summary = { totalRows: rows.length, idsWithAvg: 0, idsSingleRetailer: 0, excludedCurrency: 0, missingPrice: 0 };
+  const idsCounted = new Set();
+
+  for (const r of rows) {
+    const id = (r[v.identifierCol] || '').toString().trim();
+    if (!id) continue;
+    const retailer = (r[v.retailerCol] || '').toString().trim();
+    if (!retailer) continue;
+    if (displayedSet && !displayedSet.has(retailer)) continue;
+    const currency = v.currencyCol ? (r[v.currencyCol] || '').toString().trim() : '';
+    const groupKey = groupKeyFromRows(r, groupByCols);
+    const groupLabel = groupByCols.map(c => (r[c] || '')).join(' · ') || 'All rows';
+
+    for (const cmpCol of cmps) {
+      const g = ensureGroup(results[cmpCol].groups, groupKey, groupLabel, v.edges);
+      const idKey = v.currencyCol ? (id + '||' + currency) : id;
+      const avg = avgGroups[cmpCol].get(idKey);
+      const price = parseNumber(r[cmpCol]);
+      const baseSynth = { [v.identifierCol]: id, [v.retailerCol]: 'AVG (' + (avg ? avg.n : 0) + ' retailers)', [cmpCol]: avg ? (avg.sum / avg.n) : '' };
+      if (v.currencyCol) baseSynth[v.currencyCol] = currency;
+
+      if (price == null) { pushSpecial(g, 'missing', { key: id + '||' + retailer, prev: baseSynth, new: r, cmpCol, ov: avg ? avg.sum / avg.n : null, nv: null, _mode: 'variance', retailer, identifier: id, currency }); continue; }
+      if (!avg || avg.n === 0) { pushSpecial(g, 'noAvg', { key: id + '||' + retailer, prev: baseSynth, new: r, cmpCol, ov: null, nv: price, _mode: 'variance', retailer, identifier: id, currency }); continue; }
+      if (avg.n === 1 && avg.retailers.has(retailer)) { pushSpecial(g, 'single', { key: id + '||' + retailer, prev: baseSynth, new: r, cmpCol, ov: avg.sum / avg.n, nv: price, pct: 0, _mode: 'variance', retailer, identifier: id, currency }); continue; }
+
+      const avgVal = avg.sum / avg.n;
+      let pct;
+      if (avgVal === 0) pct = price === 0 ? 0 : Infinity * Math.sign(price);
+      else pct = ((price - avgVal) / Math.abs(avgVal)) * 100;
+      const bi = bucketIndex(pct, v.edges);
+      g.counts[bi] = (g.counts[bi] || 0) + 1;
+      g.rows[bi] = g.rows[bi] || [];
+      g.rows[bi].push({ key: id + '||' + retailer, prev: baseSynth, new: r, cmpCol, ov: avgVal, nv: price, pct, _mode: 'variance', retailer, identifier: id, currency });
+    }
+  }
+  // Patch: ensureGroup currently doesn't know about "noAvg"/"single" specials. Patch their containers if needed.
+  for (const cmpCol of cmps) {
+    for (const [_, g] of results[cmpCol].groups) {
+      if (g.special.single == null) { g.special.single = 0; g.specialRows.single = []; }
+      if (g.special.noAvg == null) { g.special.noAvg = 0; g.specialRows.noAvg = []; }
+    }
+  }
+
+  state.variance.results = {
+    mode: 'variance',
+    results, summary, cmps, edges: v.edges,
+    groupByCols, matchKeys: [v.identifierCol, v.retailerCol],
+    sourceFileName: src.file.name,
+    identifierCol: v.identifierCol, retailerCol: v.retailerCol, currencyCol: v.currencyCol,
+    avgGroups,
+  };
+  state.variance.lastRunFingerprint = mappingFingerprint();
+  return true;
 }
 
 function ensureGroup(map, key, label, edges) {
   if (!map.has(key)) {
     map.set(key, {
       label, counts: new Array(edges.length + 1).fill(0),
-      special: { dropped: 0, new: 0, missing: 0 },
+      special: { dropped: 0, new: 0, missing: 0, single: 0, noAvg: 0 },
       rows: {},
-      specialRows: { dropped: [], new: [], missing: [] },
+      specialRows: { dropped: [], new: [], missing: [], single: [], noAvg: [] },
     });
   }
   return map.get(key);
 }
-function pushSpecial(g, kind, row) { g.special[kind]++; g.specialRows[kind].push(row); }
-
+function pushSpecial(g, kind, row) {
+  if (g.special[kind] == null) { g.special[kind] = 0; g.specialRows[kind] = []; }
+  g.special[kind]++; g.specialRows[kind].push(row);
+}
 function buildKeyMap(rows, keys) {
   const m = new Map();
   for (const r of rows) {
@@ -1102,7 +1807,6 @@ function groupKeyFromRows(row, cols) {
   if (!row || !cols.length) return '__ALL__';
   return cols.map(c => (row[c] == null ? '' : String(row[c]).trim())).join('||');
 }
-
 function parseNumber(v) {
   if (v == null) return null;
   let s = String(v).trim();
@@ -1114,28 +1818,17 @@ function parseNumber(v) {
   const n = Number(s);
   return Number.isFinite(n) ? n : null;
 }
-
-function bucketIndex(pct, edges) {
-  if (!Number.isFinite(pct)) return edges.length;
-  for (let i = 0; i < edges.length; i++) if (pct <= edges[i]) return i;
-  return edges.length;
-}
-
+function bucketIndex(pct, edges) { if (!Number.isFinite(pct)) return edges.length; for (let i = 0; i < edges.length; i++) if (pct <= edges[i]) return i; return edges.length; }
 function bucketLabels(edges) {
   const labels = [];
   for (let i = 0; i <= edges.length; i++) {
     if (i === 0) labels.push('<' + fmtEdge(edges[0]) + '%');
     else if (i === edges.length) labels.push('>' + fmtEdge(edges[edges.length - 1]) + '%');
-    else {
-      const lo = edges[i-1], hi = edges[i];
-      if (lo < 0 && hi > 0) labels.push('±' + fmtEdge(Math.max(Math.abs(lo), Math.abs(hi))) + '%');
-      else labels.push(fmtEdge(lo) + '/' + fmtEdge(hi) + '%');
-    }
+    else { const lo = edges[i-1], hi = edges[i]; if (lo < 0 && hi > 0) labels.push('±' + fmtEdge(Math.max(Math.abs(lo), Math.abs(hi))) + '%'); else labels.push(fmtEdge(lo) + '/' + fmtEdge(hi) + '%'); }
   }
   return labels;
 }
 function fmtEdge(n) { return n > 0 ? '+' + n : String(n); }
-
 function bucketSeverity(edges, i) {
   let lo, hi;
   if (i === 0) { lo = -Infinity; hi = edges[0]; }
@@ -1151,119 +1844,127 @@ function bucketSeverity(edges, i) {
   return 'extreme';
 }
 
-// ===========================================================================
-// Render results
-// ===========================================================================
+// ============================================================================
+// Render results — evolution + variance
+// ============================================================================
 function renderResults() {
-  if (!state.results) return;
-  const { results, summary, cmps, edges, groupByCols, prevFileName, newFileName, prevRowCount, newRowCount } = state.results;
+  $('#results').innerHTML = '';
+  if (state.evolution.results) {
+    const sec = document.createElement('div'); sec.className = 'results-section';
+    sec.innerHTML = `<div class="section-title"><span class="badge">EVOLUTION</span> Price evolution — previous vs new</div>`;
+    sec.appendChild(renderResultBlock(state.evolution.results, 'evolution'));
+    $('#results').appendChild(sec);
+  }
+  if (state.variance.results) {
+    const sec = document.createElement('div'); sec.className = 'results-section variance';
+    sec.innerHTML = `<div class="section-title"><span class="badge">VARIANCE</span> Each retailer vs the per-identifier average</div>`;
+    sec.appendChild(renderResultBlock(state.variance.results, 'variance'));
+    $('#results').appendChild(sec);
+  }
+}
 
-  const counters = [
-    { label: 'Previous rows', value: prevRowCount, sub: prevFileName },
-    { label: 'New rows', value: newRowCount, sub: newFileName },
-    { label: 'Unique keys', value: summary.totalKeys, sub: '' },
-    { label: 'Matched', value: summary.matched, sub: '' },
-    { label: 'Dropped', value: summary.dropped, sub: 'in previous only' },
-    { label: 'New listings', value: summary.newKeys, sub: 'in new only' },
-  ];
-  $('#counters').innerHTML = counters.map(c => `<div class="counter"><div class="label">${escapeHtml(c.label)}</div><div class="value">${c.value.toLocaleString()}</div><div class="sub-value">${escapeHtml(c.sub || '')}</div></div>`).join('');
+function renderResultBlock(R, mode) {
+  const wrap = document.createElement('div');
+  const labels = bucketLabels(R.edges);
+  const groupHead = R.groupByCols.length ? R.groupByCols.join(' · ') : '(all rows)';
 
-  const labels = bucketLabels(edges);
-  const groupHead = groupByCols.length ? groupByCols.join(' · ') : '(all rows)';
-  $('#sort-info').innerHTML = state.resultsSort.col ? `Sorted by <b>${escapeHtml(sortLabel(state.resultsSort.col, labels))}</b> ${state.resultsSort.dir}` : 'Click any column header to sort';
+  // Counters
+  const counters = [];
+  if (mode === 'evolution') {
+    counters.push({ label: 'Previous rows', value: R.prevRowCount, sub: R.prevFileName });
+    counters.push({ label: 'New rows', value: R.newRowCount, sub: R.newFileName });
+    counters.push({ label: 'Unique keys', value: R.summary.totalKeys, sub: '' });
+    counters.push({ label: 'Matched', value: R.summary.matched, sub: '' });
+    counters.push({ label: 'Dropped', value: R.summary.dropped, sub: 'in previous only' });
+    counters.push({ label: 'New listings', value: R.summary.newKeys, sub: 'in new only' });
+  } else {
+    counters.push({ label: 'Source rows', value: R.summary.totalRows, sub: R.sourceFileName });
+    counters.push({ label: 'Identifier col', value: R.identifierCol, sub: '' });
+    counters.push({ label: 'Retailer col', value: R.retailerCol, sub: '' });
+    counters.push({ label: 'Currency col', value: R.currencyCol || '— none —', sub: R.currencyCol ? 'same-currency only' : 'all mixed' });
+  }
+  const counterHtml = `<div class="counters">${counters.map(c => `<div class="counter"><div class="label">${escapeHtml(c.label)}</div><div class="value">${typeof c.value === 'number' ? c.value.toLocaleString() : escapeHtml(String(c.value))}</div><div class="sub-value">${escapeHtml(c.sub || '')}</div></div>`).join('')}</div>`;
 
-  const out = [];
-  for (const cmpCol of cmps) {
-    const groupMap = results[cmpCol].groups;
+  const legendHtml = `<div class="legend">
+      <span><span class="swatch" style="background:var(--green-bg)"></span> Stable (±5%)</span>
+      <span><span class="swatch" style="background:var(--yellow)"></span> Mild (±5–30%)</span>
+      <span><span class="swatch" style="background:var(--orange)"></span> Moderate (±30–50%)</span>
+      <span><span class="swatch" style="background:var(--pink)"></span> Strong (±50–100%)</span>
+      <span><span class="swatch" style="background:var(--red)"></span> Extreme (&gt;±100%)</span>
+      <span style="margin-left:14px;color:var(--accent);font-weight:600;">→ Click a group name (left column) to see details.</span>
+    </div>`;
+
+  let blocks = '';
+  for (const cmpCol of R.cmps) {
+    const groupMap = R.results[cmpCol].groups;
     const groups = Array.from(groupMap.entries()).map(([k, g]) => ({ key: k, g }));
     const term = state.resultsSearch;
     const filtered = term ? groups.filter(x => x.g.label.toLowerCase().includes(term)) : groups;
     filtered.sort(makeGroupSortFn(state.resultsSort, labels));
 
+    const pill = mode === 'evolution' ? `<span class="vs-pill">PREV → NEW</span>` : `<span class="vs-pill variance">AVG → RETAILER</span>`;
     let html = `<div class="matrix-block">
-      <h3><span class="vs-pill">PREVIOUS → NEW</span>${escapeHtml(cmpCol)} <span class="sub">— grouped by ${escapeHtml(groupHead)}</span></h3>
-      <div class="matrix-wrap"><table class="matrix" data-cmpcol="${escapeAttr(cmpCol)}"><thead><tr>
+      <h3>${pill}${escapeHtml(cmpCol)} <span class="sub">— grouped by ${escapeHtml(groupHead)}</span></h3>
+      <div class="matrix-wrap"><table class="matrix" data-cmpcol="${escapeAttr(cmpCol)}" data-mode="${mode}"><thead><tr>
         <th class="row-head ${state.resultsSort.col === 'label' ? 'sorted' : ''}" data-sort="label">${escapeHtml(groupHead)} <span class="sort-arrow">${arrowFor('label')}</span></th>`;
     labels.forEach((l, bi) => {
       const sortKey = 'b' + bi;
       html += `<th class="${state.resultsSort.col === sortKey ? 'sorted' : ''}" data-sort="${sortKey}">${escapeHtml(l)} <span class="sort-arrow">${arrowFor(sortKey)}</span></th>`;
     });
     html += `</tr></thead><tbody>`;
-
     for (const { key, g } of filtered) {
-      html += `<tr><td class="row-head" data-cmpcol="${escapeAttr(cmpCol)}" data-group="${escapeAttr(key)}">${escapeHtml(g.label)} <span class="open-icon">▸</span></td>`;
+      html += `<tr><td class="row-head" data-cmpcol="${escapeAttr(cmpCol)}" data-group="${escapeAttr(key)}" data-mode="${mode}">${escapeHtml(g.label)} <span class="open-icon">▸</span></td>`;
       for (let bi = 0; bi < labels.length; bi++) {
         const n = g.counts[bi];
-        const sev = bucketSeverity(edges, bi);
-        if (n > 0) html += `<td class="cell ${sev}" data-cmpcol="${escapeAttr(cmpCol)}" data-group="${escapeAttr(key)}" data-bucket="${bi}">${n.toLocaleString()}</td>`;
+        const sev = bucketSeverity(R.edges, bi);
+        if (n > 0) html += `<td class="cell ${sev}" data-cmpcol="${escapeAttr(cmpCol)}" data-group="${escapeAttr(key)}" data-bucket="${bi}" data-mode="${mode}">${n.toLocaleString()}</td>`;
         else html += `<td class="empty">·</td>`;
       }
       html += `</tr>`;
     }
     if (!filtered.length) html += `<tr><td colspan="${labels.length + 1}" style="padding:20px;text-align:center;color:var(--muted);">No rows match "${escapeHtml(state.resultsSearch)}"</td></tr>`;
     html += `</tbody></table></div></div>`;
-    out.push(html);
+    blocks += html;
   }
-  $('#results').innerHTML = out.join('');
 
-  $$('#results td.cell').forEach(td => td.addEventListener('click', onCellClick));
-  $$('#results td.row-head[data-group]').forEach(td => td.addEventListener('click', onGroupHeadClick));
-  $$('#results th[data-sort]').forEach(th => th.addEventListener('click', () => {
+  wrap.innerHTML = counterHtml + legendHtml + blocks;
+  wrap.querySelectorAll('td.cell').forEach(td => td.addEventListener('click', onCellClick));
+  wrap.querySelectorAll('td.row-head[data-group]').forEach(td => td.addEventListener('click', onGroupHeadClick));
+  wrap.querySelectorAll('th[data-sort]').forEach(th => th.addEventListener('click', () => {
     const col = th.dataset.sort;
     if (state.resultsSort.col === col) state.resultsSort.dir = state.resultsSort.dir === 'desc' ? 'asc' : 'desc';
     else state.resultsSort = { col, dir: col === 'label' ? 'asc' : 'desc' };
     renderResults();
   }));
+  return wrap;
 }
 
-function arrowFor(col) {
-  if (state.resultsSort.col !== col) return '↕';
-  return state.resultsSort.dir === 'asc' ? '▲' : '▼';
-}
-
-function sortLabel(col, labels) {
-  if (col === 'label') return 'group name';
-  if (col && col.startsWith('b')) return labels[+col.slice(1)];
-  return col;
-}
-
+function arrowFor(col) { if (state.resultsSort.col !== col) return '↕'; return state.resultsSort.dir === 'asc' ? '▲' : '▼'; }
 function makeGroupSortFn(sort, labels) {
   return (a, b) => {
     const dir = sort.dir === 'asc' ? 1 : -1;
     if (!sort.col) return a.g.label.localeCompare(b.g.label);
-    if (sort.col === 'label') {
-      const va = a.g.label.toLowerCase(), vb = b.g.label.toLowerCase();
-      return va < vb ? -dir : va > vb ? dir : 0;
-    }
+    if (sort.col === 'label') { const va = a.g.label.toLowerCase(), vb = b.g.label.toLowerCase(); return va < vb ? -dir : va > vb ? dir : 0; }
     if (sort.col.startsWith('b')) { const bi = +sort.col.slice(1); return ((a.g.counts[bi] || 0) - (b.g.counts[bi] || 0)) * dir; }
     return 0;
   };
 }
 
-// ===========================================================================
-// Group overview — TABLE (no bucket counts; those are visible in the matrix)
-// ===========================================================================
+// ============================================================================
+// Click → group overview (table)
+// ============================================================================
 function onGroupHeadClick(e) {
   const td = e.currentTarget;
-  openGroupOverview(td.dataset.cmpcol, td.dataset.group);
+  openGroupOverview(td.dataset.cmpcol, td.dataset.group, td.dataset.mode);
 }
 
-function openGroupOverview(cmpCol, groupKey) {
-  const g = state.results.results[cmpCol].groups.get(groupKey);
+function openGroupOverview(cmpCol, groupKey, mode) {
+  const R = (mode === 'variance' ? state.variance.results : state.evolution.results);
+  const g = R.results[cmpCol].groups.get(groupKey);
   if (!g) return;
-  const matched = g.counts.reduce((a,b)=>a+b,0);
-  const inPrev = matched + g.special.dropped + g.special.missing;
-  const inNew = matched + g.special.new + g.special.missing;
-  const dRows = inNew - inPrev;
-  const total = matched + g.special.dropped + g.special.new + g.special.missing;
-
-  state.drawer = {
-    mode: 'group',
-    cmpCol, groupKey, groupLabel: g.label,
-    overview: { matched, dropped: g.special.dropped, new: g.special.new, missing: g.special.missing, inPrev, inNew, dRows, total },
-  };
+  state.drawer = { mode: 'group', sourceMode: mode, cmpCol, groupKey, groupLabel: g.label };
   $('#drawer-title').textContent = g.label;
-  $('#drawer-sub').textContent = `${cmpCol} — group overview`;
+  $('#drawer-sub').textContent = `${cmpCol} — ${mode === 'variance' ? 'variance' : 'evolution'} overview`;
   $('#drawer-back').classList.add('hide');
   $('#drawer-toolbar').classList.add('hide');
   $('#drawer-rendered').textContent = '';
@@ -1275,105 +1976,91 @@ function openGroupOverview(cmpCol, groupKey) {
 
 function renderGroupOverview() {
   const d = state.drawer;
-  const cmps = state.results.cmps;
-  const groupKey = d.groupKey;
+  const R = (d.sourceMode === 'variance' ? state.variance.results : state.evolution.results);
+  const cmps = R.cmps;
+  const isVar = d.sourceMode === 'variance';
 
-  // Build a row per compare column for this group
   const rows = cmps.map(cmpCol => {
-    const g = state.results.results[cmpCol].groups.get(groupKey);
-    if (!g) return null;
+    const g = R.results[cmpCol].groups.get(d.groupKey); if (!g) return null;
     const matched = g.counts.reduce((a, b) => a + b, 0);
-    const inPrev = matched + g.special.dropped + g.special.missing;
-    const inNew = matched + g.special.new + g.special.missing;
-    const dRows = inNew - inPrev;
-    const total = matched + g.special.dropped + g.special.new + g.special.missing;
-    return { cmpCol, matched, dropped: g.special.dropped, new: g.special.new, missing: g.special.missing, inPrev, inNew, dRows, total };
+    if (isVar) {
+      const inSource = matched + (g.special.missing || 0) + (g.special.noAvg || 0) + (g.special.single || 0);
+      return { cmpCol, matched, missing: g.special.missing || 0, noAvg: g.special.noAvg || 0, single: g.special.single || 0, inSource, isVar: true };
+    } else {
+      const inPrev = matched + g.special.dropped + g.special.missing;
+      const inNew = matched + g.special.new + g.special.missing;
+      const dRows = inNew - inPrev;
+      const total = matched + g.special.dropped + g.special.new + g.special.missing;
+      return { cmpCol, matched, dropped: g.special.dropped, new: g.special.new, missing: g.special.missing, inPrev, inNew, dRows, total, isVar: false };
+    }
   }).filter(Boolean);
 
   let html = `<div style="padding:18px 4px 12px;">
     <div style="margin-bottom:14px;color:var(--muted);font-size:13px;">
-      <b style="color:var(--ink);font-size:14px;">${escapeHtml(d.groupLabel)}</b> &nbsp;·&nbsp; overview across ${cmps.length} compare column${cmps.length > 1 ? 's' : ''}. Click any non-zero count to see the SKUs.
+      <b style="color:var(--ink);font-size:14px;">${escapeHtml(d.groupLabel)}</b> &nbsp;·&nbsp; ${isVar ? 'variance overview' : 'evolution overview'} across ${cmps.length} compare column${cmps.length > 1 ? 's' : ''}. Click any non-zero count to see the SKUs.
     </div>
     <div class="matrix-wrap"><table class="matrix">
       <thead><tr>
-        <th class="row-head">Compare column</th>
-        <th>Matched <span class="help" title="Rows in both files with comparable numeric values. Bucket distribution is in the main matrix above.">?</span></th>
+        <th class="row-head">Compare column</th>`;
+
+  if (isVar) {
+    html += `<th>Matched <span class="help" title="Identifiers (× retailer) that fall into a variance bucket.">?</span></th>
+        <th>Missing <span class="help" title="Source rows where the price is empty / non-numeric for this column.">?</span></th>
+        <th>No average <span class="help" title="No average could be computed (no included retailer priced this identifier, possibly currency mismatch).">?</span></th>
+        <th>Single retailer <span class="help" title="The identifier had only this one retailer in the included set — variance is meaningless (zero).">?</span></th>
+        <th>In source <span class="help" title="Total displayed rows for this group across the source.">?</span></th>`;
+  } else {
+    html += `<th>Matched <span class="help" title="Rows in both files with comparable numeric values. Bucket distribution is in the main matrix above.">?</span></th>
         <th>Dropped <span class="help" title="Match-key in PREVIOUS, NOT in NEW. De-listed, key changed, or matching error.">?</span></th>
         <th>New <span class="help" title="Match-key in NEW, NOT in PREVIOUS. Newly listed or feed-format change.">?</span></th>
         <th>Missing <span class="help" title="Present in both files but the value is empty / non-numeric in one of them.">?</span></th>
-        <th>In previous <span class="help" title="Distinct match-keys for this group in the previous file.">?</span></th>
-        <th>In new <span class="help" title="Distinct match-keys for this group in the new file.">?</span></th>
-        <th>Δ rows <span class="help" title="(In new) − (In previous). Positive = group grew; negative = shrank.">?</span></th>
-        <th>Total <span class="help" title="Union of distinct keys across both files for this group.">?</span></th>
-      </tr></thead>
-      <tbody>`;
+        <th>In previous</th><th>In new</th><th>Δ rows</th><th>Total</th>`;
+  }
+  html += `</tr></thead><tbody>`;
 
   for (const r of rows) {
-    const dCls = r.dRows > 0 ? 'delta-pos' : r.dRows < 0 ? 'delta-neg' : 'delta-zero';
-    const dTxt = (r.dRows > 0 ? '+' : '') + r.dRows.toLocaleString();
-    const matchedCell = r.matched
-      ? `<td class="cell matched-cell" data-cmpcol="${escapeAttr(r.cmpCol)}" data-action="matched">${r.matched.toLocaleString()}</td>`
-      : `<td class="empty">·</td>`;
-    const droppedCell = r.dropped
-      ? `<td class="cell special" data-cmpcol="${escapeAttr(r.cmpCol)}" data-action="dropped">${r.dropped.toLocaleString()}</td>`
-      : `<td class="empty">·</td>`;
-    const newCell = r.new
-      ? `<td class="cell special" data-cmpcol="${escapeAttr(r.cmpCol)}" data-action="new">${r.new.toLocaleString()}</td>`
-      : `<td class="empty">·</td>`;
-    const missingCell = r.missing
-      ? `<td class="cell special" data-cmpcol="${escapeAttr(r.cmpCol)}" data-action="missing">${r.missing.toLocaleString()}</td>`
-      : `<td class="empty">·</td>`;
-
-    html += `<tr>
-      <td class="row-head">${escapeHtml(r.cmpCol)}</td>
-      ${matchedCell}
-      ${droppedCell}
-      ${newCell}
-      ${missingCell}
-      <td>${r.inPrev.toLocaleString()}</td>
-      <td>${r.inNew.toLocaleString()}</td>
-      <td class="${dCls}">${dTxt}</td>
-      <td class="total">${r.total.toLocaleString()}</td>
-    </tr>`;
+    if (isVar) {
+      const matchedCell = r.matched ? `<td class="cell matched-cell" data-cmpcol="${escapeAttr(r.cmpCol)}" data-action="matched">${r.matched.toLocaleString()}</td>` : '<td class="empty">·</td>';
+      const missingCell = r.missing ? `<td class="cell special" data-cmpcol="${escapeAttr(r.cmpCol)}" data-action="missing">${r.missing.toLocaleString()}</td>` : '<td class="empty">·</td>';
+      const noAvgCell = r.noAvg ? `<td class="cell special" data-cmpcol="${escapeAttr(r.cmpCol)}" data-action="noAvg">${r.noAvg.toLocaleString()}</td>` : '<td class="empty">·</td>';
+      const singleCell = r.single ? `<td class="cell special" data-cmpcol="${escapeAttr(r.cmpCol)}" data-action="single">${r.single.toLocaleString()}</td>` : '<td class="empty">·</td>';
+      html += `<tr><td class="row-head">${escapeHtml(r.cmpCol)}</td>${matchedCell}${missingCell}${noAvgCell}${singleCell}<td class="total">${r.inSource.toLocaleString()}</td></tr>`;
+    } else {
+      const dCls = r.dRows > 0 ? 'delta-pos' : r.dRows < 0 ? 'delta-neg' : 'delta-zero';
+      const dTxt = (r.dRows > 0 ? '+' : '') + r.dRows.toLocaleString();
+      const matchedCell = r.matched ? `<td class="cell matched-cell" data-cmpcol="${escapeAttr(r.cmpCol)}" data-action="matched">${r.matched.toLocaleString()}</td>` : '<td class="empty">·</td>';
+      const droppedCell = r.dropped ? `<td class="cell special" data-cmpcol="${escapeAttr(r.cmpCol)}" data-action="dropped">${r.dropped.toLocaleString()}</td>` : '<td class="empty">·</td>';
+      const newCell = r.new ? `<td class="cell special" data-cmpcol="${escapeAttr(r.cmpCol)}" data-action="new">${r.new.toLocaleString()}</td>` : '<td class="empty">·</td>';
+      const missingCell = r.missing ? `<td class="cell special" data-cmpcol="${escapeAttr(r.cmpCol)}" data-action="missing">${r.missing.toLocaleString()}</td>` : '<td class="empty">·</td>';
+      html += `<tr><td class="row-head">${escapeHtml(r.cmpCol)}</td>${matchedCell}${droppedCell}${newCell}${missingCell}<td>${r.inPrev.toLocaleString()}</td><td>${r.inNew.toLocaleString()}</td><td class="${dCls}">${dTxt}</td><td class="total">${r.total.toLocaleString()}</td></tr>`;
+    }
   }
   html += `</tbody></table></div></div>`;
-
   $('#drawer-body').innerHTML = html;
   $$('#drawer-body td.cell').forEach(td => td.addEventListener('click', () => {
     const cmpCol = td.dataset.cmpcol;
     const action = td.dataset.action;
-    if (action === 'matched') openRowsView(cmpCol, d.groupKey, { matchedAll: true }, true);
-    else openRowsView(cmpCol, d.groupKey, { special: action }, true);
+    if (action === 'matched') openRowsView(cmpCol, d.groupKey, { matchedAll: true }, true, d.sourceMode);
+    else openRowsView(cmpCol, d.groupKey, { special: action }, true, d.sourceMode);
   }));
 }
 
 function onCellClick(e) {
   const td = e.currentTarget;
-  openRowsView(td.dataset.cmpcol, td.dataset.group, { bucket: Number(td.dataset.bucket) }, false);
+  openRowsView(td.dataset.cmpcol, td.dataset.group, { bucket: Number(td.dataset.bucket) }, false, td.dataset.mode);
 }
 
-function openRowsView(cmpCol, groupKey, scope, cameFromOverview) {
-  const g = state.results.results[cmpCol].groups.get(groupKey);
+function openRowsView(cmpCol, groupKey, scope, cameFromOverview, sourceMode) {
+  const R = (sourceMode === 'variance' ? state.variance.results : state.evolution.results);
+  const g = R.results[cmpCol].groups.get(groupKey);
   if (!g) return;
   let rows, title, kind, bucketIdx = null;
-  if (scope.matchedAll) {
-    kind = 'matchedAll';
-    rows = [];
-    Object.values(g.rows).forEach(arr => rows.push(...arr));
-    title = `${cmpCol} — all matched rows`;
-  } else if (scope.bucket != null) {
-    kind = 'bucket'; bucketIdx = scope.bucket;
-    rows = g.rows[bucketIdx] || [];
-    title = `${cmpCol} — ${bucketLabels(state.results.edges)[bucketIdx]}`;
-  } else {
-    kind = scope.special;
-    rows = g.specialRows[kind] || [];
-    title = `${cmpCol} — ${labelForSpecial(kind)}`;
-  }
+  if (scope.matchedAll) { kind = 'matchedAll'; rows = []; Object.values(g.rows).forEach(arr => rows.push(...arr)); title = `${cmpCol} — all matched rows`; }
+  else if (scope.bucket != null) { kind = 'bucket'; bucketIdx = scope.bucket; rows = g.rows[bucketIdx] || []; title = `${cmpCol} — ${bucketLabels(R.edges)[bucketIdx]}`; }
+  else { kind = scope.special; rows = g.specialRows[kind] || []; title = `${cmpCol} — ${labelForSpecial(kind)}`; }
 
   state.drawer = {
-    mode: 'rows',
-    cmpCol, groupKey, groupLabel: g.label,
+    mode: 'rows', sourceMode, cmpCol, groupKey, groupLabel: g.label,
     rows, kind, bucket: bucketIdx,
     sort: { col: null, dir: null }, search: '',
     cameFromOverview,
@@ -1384,32 +2071,65 @@ function openRowsView(cmpCol, groupKey, scope, cameFromOverview) {
   $('#drawer-back').classList.toggle('hide', !cameFromOverview);
   $('#drawer-toolbar').classList.remove('hide');
   $('#export-xlsx-drawer').classList.remove('hide');
+  // "Run variance on these SKUs" — only relevant from evolution row views with bucket rows
+  const canChain = sourceMode === 'evolution' && (kind === 'bucket' || kind === 'matchedAll' || kind === 'missing');
+  $('#chain-to-variance').classList.toggle('hide', !canChain);
   renderDrawerRows();
   openDrawer();
 }
 
 function goBackToGroupOverview() {
-  if (state.drawer && state.drawer.cameFromOverview) openGroupOverview(state.drawer.cmpCol, state.drawer.groupKey);
+  if (state.drawer && state.drawer.cameFromOverview) openGroupOverview(state.drawer.cmpCol, state.drawer.groupKey, state.drawer.sourceMode);
 }
-
 function labelForSpecial(s) {
-  return ({ dropped: 'Dropped (only in previous)', new: 'New (only in new)', missing: 'Missing value' })[s];
+  return ({
+    dropped: 'Dropped (only in previous)',
+    new: 'New (only in new)',
+    missing: 'Missing value',
+    single: 'Single retailer (no comparison)',
+    noAvg: 'No average available',
+  })[s] || s;
 }
 
-// ===========================================================================
-// Drawer rows view — columns driven by state.columnPrefs (persisted)
-// ===========================================================================
+// Chain: evolution → variance on these SKUs
+function chainToVariance() {
+  const d = state.drawer;
+  if (!d || d.sourceMode !== 'evolution') return;
+  const keys = new Set(d.rows.map(r => r.key).filter(Boolean));
+  if (!keys.size) { alert('No SKUs to chain.'); return; }
+  state.variance.keyFilter = { matchKeys: state.evolution.results.matchKeys, keys };
+  // Switch mode to variance (or both) and scroll to step 3
+  if (state.mode !== 'both') {
+    state.mode = 'variance';
+    $$('.mode-tab').forEach(x => x.classList.toggle('active', x.dataset.mode === 'variance'));
+    $$('.mode-section').forEach(s => s.classList.remove('active'));
+    $('#cfg-variance').classList.add('active');
+  }
+  // Pre-set source = new file if not set
+  if (!state.variance.sourceId) state.variance.sourceId = state.newId;
+  populateVarianceMapping();
+  closeDrawer();
+  expandOnly('step3');
+  $('#step3').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  alert(`Variance will be restricted to the ${keys.size} SKU(s) from this drawer. Configure the variance fields and click Run.`);
+}
+
+// ============================================================================
+// Drawer rows
+// ============================================================================
 function buildDrawerColumns(d) {
   const p = state.columnPrefs;
   const cols = [];
-  if (p.showMatchKeys) state.results.matchKeys.forEach(c => cols.push({ k: c, type: 'key' }));
-  if (p.showGroupBys) state.results.groupByCols.forEach(c => { if (!state.results.matchKeys.includes(c)) cols.push({ k: c, type: 'group' }); });
-  if (p.showPrevValue) cols.push({ k: `${d.cmpCol} — previous`, type: 'val_prev', src: d.cmpCol });
-  if (p.showNewValue) cols.push({ k: `${d.cmpCol} — new`, type: 'val_new', src: d.cmpCol });
-  // Δ % only meaningful when both values exist (bucket or missing rows)
-  if (p.showDeltaPct && (d.kind === 'bucket' || d.kind === 'missing' || d.kind === 'matchedAll')) cols.push({ k: 'Δ %', type: 'd_pct' });
-  // Reserved cols set: dedupe extras
-  const reserved = new Set([...state.results.matchKeys, ...state.results.groupByCols, d.cmpCol]);
+  const isVar = d.sourceMode === 'variance';
+  const R = (isVar ? state.variance.results : state.evolution.results);
+
+  if (p.showMatchKeys) R.matchKeys.forEach(c => cols.push({ k: c, type: 'key' }));
+  if (p.showGroupBys) R.groupByCols.forEach(c => { if (!R.matchKeys.includes(c)) cols.push({ k: c, type: 'group' }); });
+  if (p.showPrevValue) cols.push({ k: isVar ? `${d.cmpCol} — group avg` : `${d.cmpCol} — previous`, type: 'val_prev', src: d.cmpCol });
+  if (p.showNewValue) cols.push({ k: isVar ? `${d.cmpCol} — retailer price` : `${d.cmpCol} — new`, type: 'val_new', src: d.cmpCol });
+  if (p.showDeltaPct && (d.kind === 'bucket' || d.kind === 'missing' || d.kind === 'matchedAll' || d.kind === 'single')) cols.push({ k: isVar ? 'Variance %' : 'Δ %', type: 'd_pct' });
+
+  const reserved = new Set([...R.matchKeys, ...R.groupByCols, d.cmpCol]);
   p.extras.forEach(c => { if (!reserved.has(c)) cols.push({ k: c, type: 'extra' }); });
   return cols;
 }
@@ -1417,22 +2137,18 @@ function buildDrawerColumns(d) {
 function getRowValue(r, col) {
   const pr = r.prev || {}, nr = r.new || {};
   if (col.type === 'key' || col.type === 'group') return (nr[col.k] != null && nr[col.k] !== '') ? nr[col.k] : (pr[col.k] || '');
-  if (col.type === 'val_prev') return pr[col.src] || '';
-  if (col.type === 'val_new') return nr[col.src] || '';
+  if (col.type === 'val_prev') return r._mode === 'variance' ? (r.ov != null ? r.ov : '') : (pr[col.src] || '');
+  if (col.type === 'val_new') return r._mode === 'variance' ? (r.nv != null ? r.nv : '') : (nr[col.src] || '');
   if (col.type === 'd_pct') return r.pct == null ? '' : r.pct;
   if (col.type === 'extra') return (nr[col.k] != null && nr[col.k] !== '') ? nr[col.k] : (pr[col.k] || '');
   return '';
 }
 function formatRowValue(r, col) {
   const v = getRowValue(r, col);
-  if (col.type === 'd_pct') {
-    if (v === '') return '';
-    if (!Number.isFinite(v)) return '∞';
-    return (v >= 0 ? '+' : '') + v.toFixed(2) + '%';
-  }
+  if (col.type === 'd_pct') { if (v === '') return ''; if (!Number.isFinite(v)) return '∞'; return (v >= 0 ? '+' : '') + v.toFixed(2) + '%'; }
+  if ((col.type === 'val_prev' || col.type === 'val_new') && typeof v === 'number') return v.toFixed(2);
   return String(v);
 }
-
 function renderCellHtml(text) {
   if (/^https?:\/\//i.test(text)) {
     const truncated = text.length > 80 ? text.slice(0, 77) + '…' : text;
@@ -1445,13 +2161,9 @@ function renderDrawerRows() {
   const d = state.drawer; if (!d || d.mode !== 'rows') return;
   const columns = buildDrawerColumns(d);
   let rows = d.rows.slice();
-  if (d.search) {
-    const term = d.search;
-    rows = rows.filter(r => columns.some(col => formatRowValue(r, col).toLowerCase().includes(term)));
-  }
+  if (d.search) { const term = d.search; rows = rows.filter(r => columns.some(col => formatRowValue(r, col).toLowerCase().includes(term))); }
   if (d.sort.col != null) {
-    const colIdx = d.sort.col;
-    const col = columns[colIdx];
+    const col = columns[d.sort.col];
     if (col) {
       const dir = d.sort.dir === 'asc' ? 1 : -1;
       rows.sort((a, b) => {
@@ -1466,22 +2178,12 @@ function renderDrawerRows() {
   }
   const maxRender = 2000;
   const sliced = rows.slice(0, maxRender);
-
   let html = '<table><thead><tr>';
-  columns.forEach((c, i) => {
-    const sorted = d.sort.col === i ? 'sorted' : '';
-    const arr = d.sort.col === i ? (d.sort.dir === 'asc' ? '▲' : '▼') : '↕';
-    html += `<th class="${sorted}" data-i="${i}">${escapeHtml(c.k)} <span class="sort-arrow">${arr}</span></th>`;
-  });
+  columns.forEach((c, i) => { const sorted = d.sort.col === i ? 'sorted' : ''; const arr = d.sort.col === i ? (d.sort.dir === 'asc' ? '▲' : '▼') : '↕'; html += `<th class="${sorted}" data-i="${i}">${escapeHtml(c.k)} <span class="sort-arrow">${arr}</span></th>`; });
   html += '</tr></thead><tbody>';
   for (const r of sliced) {
     html += '<tr>';
-    columns.forEach(c => {
-      const txt = formatRowValue(r, c);
-      let cls = '';
-      if (c.type === 'd_pct' && r.pct != null && Number.isFinite(r.pct)) cls = r.pct > 0 ? 'pos' : (r.pct < 0 ? 'neg' : '');
-      html += `<td class="${cls}">${renderCellHtml(txt)}</td>`;
-    });
+    columns.forEach(c => { const txt = formatRowValue(r, c); let cls = ''; if (c.type === 'd_pct' && r.pct != null && Number.isFinite(r.pct)) cls = r.pct > 0 ? 'pos' : (r.pct < 0 ? 'neg' : ''); html += `<td class="${cls}">${renderCellHtml(txt)}</td>`; });
     html += '</tr>';
   }
   html += '</tbody></table>';
@@ -1489,32 +2191,28 @@ function renderDrawerRows() {
   $('#drawer-body').innerHTML = html;
   $('#drawer-count').textContent = rows.length.toLocaleString() + ' of ' + d.rows.length.toLocaleString() + ' row(s)';
   $('#drawer-rendered').textContent = rows.length > maxRender ? `Rendered ${maxRender.toLocaleString()}` : '';
-  $$('#drawer-body th[data-i]').forEach(th => th.addEventListener('click', () => {
-    const i = Number(th.dataset.i);
-    if (d.sort.col === i) d.sort.dir = d.sort.dir === 'desc' ? 'asc' : 'desc';
-    else d.sort = { col: i, dir: 'desc' };
-    renderDrawerRows();
-  }));
+  $$('#drawer-body th[data-i]').forEach(th => th.addEventListener('click', () => { const i = Number(th.dataset.i); if (d.sort.col === i) d.sort.dir = d.sort.dir === 'desc' ? 'asc' : 'desc'; else d.sort = { col: i, dir: 'desc' }; renderDrawerRows(); }));
 }
 
 function openDrawer() { $('#drawer').classList.add('open'); $('#drawer-bg').classList.add('open'); }
 function closeDrawer() { $('#drawer').classList.remove('open'); $('#drawer-bg').classList.remove('open'); state.drawer = null; closePopover(); }
 
-// ===========================================================================
-// Column picker — writes to state.columnPrefs (persists across cells + export)
-// ===========================================================================
+// ============================================================================
+// Column picker
+// ============================================================================
 function openColumnPicker(e) {
   e.stopPropagation();
   closePopover();
   const d = state.drawer; if (!d || d.mode !== 'rows') return;
-  const unionCols = unionAllFileCols();
+  const unionCols = unionAllSourceCols();
   const p = state.columnPrefs;
+  const R = (d.sourceMode === 'variance' ? state.variance.results : state.evolution.results);
 
   const pop = document.createElement('div'); pop.className = 'popover';
   pop.innerHTML = `<h5>Built-in (stay at start)</h5>
     <div id="pop-built"></div>
-    <div class="actions"><a data-act="reset">Reset to default</a><span style="color:var(--muted);font-size:11px;">Choices persist across cells &amp; the export.</span></div>
-    <h5>From the feeds <span style="text-transform:none;font-weight:400;color:var(--muted);">(appended in pick order)</span></h5>
+    <div class="actions"><a data-act="reset">Reset to default</a><span style="color:var(--muted);font-size:11px;">Choices persist across cells &amp; export.</span></div>
+    <h5>From the feeds</h5>
     <div class="pop-search"><input type="text" placeholder="Filter columns…" id="pop-search-inp"></div>
     <div id="pop-extra"></div>`;
   document.body.appendChild(pop);
@@ -1524,11 +2222,11 @@ function openColumnPicker(e) {
   pop.style.left = (rect.left + window.scrollX) + 'px';
 
   const builtTypes = [
-    { key: 'showMatchKeys', label: 'Match key columns' },
+    { key: 'showMatchKeys', label: 'Match key / identifier columns' },
     { key: 'showGroupBys', label: 'Group-by columns' },
-    { key: 'showPrevValue', label: `${d.cmpCol} — previous value` },
-    { key: 'showNewValue', label: `${d.cmpCol} — new value` },
-    { key: 'showDeltaPct', label: 'Δ %' },
+    { key: 'showPrevValue', label: d.sourceMode === 'variance' ? `${d.cmpCol} — group average` : `${d.cmpCol} — previous value` },
+    { key: 'showNewValue', label: d.sourceMode === 'variance' ? `${d.cmpCol} — retailer price` : `${d.cmpCol} — new value` },
+    { key: 'showDeltaPct', label: d.sourceMode === 'variance' ? 'Variance %' : 'Δ %' },
   ];
   const builtBox = pop.querySelector('#pop-built');
   builtTypes.forEach(bt => {
@@ -1537,52 +2235,33 @@ function openColumnPicker(e) {
     lab.querySelector('input').addEventListener('change', ev => { p[bt.key] = ev.target.checked; renderDrawerRows(); });
     builtBox.appendChild(lab);
   });
-
   const extraBox = pop.querySelector('#pop-extra');
-  const reserved = new Set([...state.results.matchKeys, ...state.results.groupByCols, d.cmpCol]);
+  const reserved = new Set([...R.matchKeys, ...R.groupByCols, d.cmpCol]);
   function renderExtras(filter = '') {
     extraBox.innerHTML = '';
     unionCols.filter(c => !reserved.has(c) && (!filter || c.toLowerCase().includes(filter))).forEach(c => {
       const present = p.extras.includes(c);
       const lab = document.createElement('label');
       lab.innerHTML = `<input type="checkbox" ${present ? 'checked' : ''}> ${escapeHtml(c)}`;
-      lab.querySelector('input').addEventListener('change', ev => {
-        if (ev.target.checked) { if (!p.extras.includes(c)) p.extras.push(c); }
-        else { p.extras = p.extras.filter(x => x !== c); }
-        renderDrawerRows();
-      });
+      lab.querySelector('input').addEventListener('change', ev => { if (ev.target.checked) { if (!p.extras.includes(c)) p.extras.push(c); } else { p.extras = p.extras.filter(x => x !== c); } renderDrawerRows(); });
       extraBox.appendChild(lab);
     });
   }
   renderExtras();
   pop.querySelector('#pop-search-inp').addEventListener('input', ev => renderExtras(ev.target.value.toLowerCase()));
-  pop.querySelector('[data-act="reset"]').addEventListener('click', () => {
-    p.showMatchKeys = true; p.showGroupBys = true; p.showPrevValue = true; p.showNewValue = true; p.showDeltaPct = true;
-    p.extras = [];
-    renderDrawerRows();
-    closePopover(); openColumnPicker({ stopPropagation: () => {} });
-  });
+  pop.querySelector('[data-act="reset"]').addEventListener('click', () => { p.showMatchKeys = true; p.showGroupBys = true; p.showPrevValue = true; p.showNewValue = true; p.showDeltaPct = true; p.extras = []; renderDrawerRows(); closePopover(); openColumnPicker({ stopPropagation: () => {} }); });
 }
-
-function unionAllFileCols() {
-  const all = new Set();
-  state.pool.forEach(e => e.parsed && e.parsed.cols.forEach(c => all.add(c)));
-  return Array.from(all);
-}
-
+function unionAllSourceCols() { const all = new Set(); state.pool.forEach(e => e.parsed && e.parsed.cols.forEach(c => all.add(c))); return Array.from(all); }
 function closePopover() { $$('.popover').forEach(p => p.remove()); }
 
-// ===========================================================================
-// Drawer → Excel export
-// ===========================================================================
+// ============================================================================
+// Drawer → Excel
+// ============================================================================
 function exportDrawerXlsx() {
   const d = state.drawer; if (!d || d.mode !== 'rows') return;
   const columns = buildDrawerColumns(d);
   let rows = d.rows.slice();
-  if (d.search) {
-    const term = d.search;
-    rows = rows.filter(r => columns.some(col => formatRowValue(r, col).toLowerCase().includes(term)));
-  }
+  if (d.search) { const term = d.search; rows = rows.filter(r => columns.some(col => formatRowValue(r, col).toLowerCase().includes(term))); }
   if (d.sort.col != null) {
     const col = columns[d.sort.col];
     if (col) {
@@ -1599,214 +2278,147 @@ function exportDrawerXlsx() {
   }
   const headers = columns.map(c => c.k);
   const aoa = [headers];
-  for (const r of rows) {
-    aoa.push(columns.map(c => {
-      const v = getRowValue(r, c);
-      if (c.type === 'd_pct') {
-        if (v === '') return '';
-        if (!Number.isFinite(v)) return 'inf';
-        return Number(v);
-      }
-      return v;
-    }));
-  }
+  for (const r of rows) aoa.push(columns.map(c => { const v = getRowValue(r, c); if (c.type === 'd_pct') { if (v === '') return ''; if (!Number.isFinite(v)) return 'inf'; return Number(v); } return v; }));
   writeXlsx([{ name: 'QC details', aoa }], `qc_${sanitize(d.cmpCol)}_${sanitize(d.groupLabel)}_${d.kind === 'bucket' ? 'bucket_' + d.bucket : d.kind}.xlsx`);
 }
-
 function writeXlsx(sheets, filename) {
   const wb = XLSX.utils.book_new();
-  for (const s of sheets) {
-    const ws = XLSX.utils.aoa_to_sheet(s.aoa);
-    XLSX.utils.book_append_sheet(wb, ws, (s.name || 'Sheet').slice(0, 30));
-  }
+  for (const s of sheets) { const ws = XLSX.utils.aoa_to_sheet(s.aoa); XLSX.utils.book_append_sheet(wb, ws, (s.name || 'Sheet').slice(0, 30)); }
   XLSX.writeFile(wb, filename);
 }
 
-// ===========================================================================
+// ============================================================================
 // Export modal
-// ===========================================================================
+// ============================================================================
 const FILTER_OPS = [
-  { id: 'contains', label: 'contains' },
-  { id: 'ncontains', label: 'does not contain' },
-  { id: 'eq', label: 'equals' },
-  { id: 'neq', label: 'does not equal' },
-  { id: 'starts', label: 'starts with' },
-  { id: 'ends', label: 'ends with' },
-  { id: 'gte', label: '≥ (number)' },
-  { id: 'lte', label: '≤ (number)' },
-  { id: 'gt', label: '> (number)' },
-  { id: 'lt', label: '< (number)' },
-  { id: 'empty', label: 'is empty' },
-  { id: 'nempty', label: 'is not empty' },
+  { id: 'contains', label: 'contains' }, { id: 'ncontains', label: 'does not contain' },
+  { id: 'eq', label: 'equals' }, { id: 'neq', label: 'does not equal' },
+  { id: 'starts', label: 'starts with' }, { id: 'ends', label: 'ends with' },
+  { id: 'gte', label: '≥ (number)' }, { id: 'lte', label: '≤ (number)' },
+  { id: 'gt', label: '> (number)' }, { id: 'lt', label: '< (number)' },
+  { id: 'empty', label: 'is empty' }, { id: 'nempty', label: 'is not empty' },
 ];
 
 function openExportModal() {
-  if (!state.results) return;
-  if (isStale()) {
-    // Mapping changed since last run — re-run silently so the export uses the latest mapping
-    runAnalysis();
-    if (!state.results) return;
-  }
+  if (!state.evolution.results && !state.variance.results) return;
+  if (isStale()) runAnalysis();
   state.export = {
-    pctMode: 'any',           // any | range | absMin | topMaxN | topMinN | topBothN
-    pctMin: null, pctMax: null, absMin: null, topN: 50,
-    filters: [],
-    personalize: false,
-    includeSpecials: { dropped: true, new: true, missing: true },
+    target: state.evolution.results ? 'evolution' : 'variance',
+    pctMode: 'any', pctMin: null, pctMax: null, absMin: null, topN: 50,
+    filters: [], personalize: false,
+    includeSpecials: { dropped: true, new: true, missing: true, single: false, noAvg: true },
   };
   renderExportBody();
   $('#export-bg').classList.add('open');
   updateExportSummary();
 }
 
+function exportTargetResults() { return state.export.target === 'variance' ? state.variance.results : state.evolution.results; }
+
 function renderExportBody() {
   const e = state.export;
   const body = $('#export-body');
-  const newE = state.pool.find(en => en.id === state.newId);
-  const allCols = newE ? newE.parsed.cols : [];
-  const inTop = e.pctMode.startsWith('top');
+  const R = exportTargetResults();
+  const isVar = R && R.mode === 'variance';
+  const haveBoth = state.evolution.results && state.variance.results;
+  const newSrc = state.pool.find(en => en.id === (isVar ? state.variance.sourceId : state.newId));
+  const allCols = newSrc ? newSrc.parsed.cols : [];
 
   body.innerHTML = `
-    <div class="info-banner">By default the export includes <b>every column of the new file</b> plus, for each compare column, the previous value and Δ %. Tick "Personalize columns" below to pick exactly which columns to include.</div>
-
+    ${haveBoth ? `<div class="section-card"><h4>Export which analysis?</h4><div style="display:flex;gap:14px;"><label><input type="radio" name="etarget" value="evolution" ${e.target === 'evolution' ? 'checked' : ''}> Evolution (previous vs new)</label><label><input type="radio" name="etarget" value="variance" ${e.target === 'variance' ? 'checked' : ''}> Variance (per identifier)</label></div></div>` : ''}
+    <div class="info-banner">Default: every column of the source + per-compare-column previous/avg value + ${isVar ? 'variance' : 'Δ'} %. Tick "Personalize columns" to override.</div>
     <div class="section-card">
-      <h4>Filter by % change <span class="help" title="Limit which rows go into the export. Top-N modes pick only the N most-extreme rows; specials are excluded in those modes.">?</span></h4>
+      <h4>Filter by ${isVar ? 'variance' : 'change'} %</h4>
       <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:8px;">
-        <label><input type="radio" name="pmode" value="any" ${e.pctMode === 'any' ? 'checked' : ''}> Any % change</label>
+        <label><input type="radio" name="pmode" value="any" ${e.pctMode === 'any' ? 'checked' : ''}> Any %</label>
         <label><input type="radio" name="pmode" value="range" ${e.pctMode === 'range' ? 'checked' : ''}> Within range</label>
-        <label><input type="radio" name="pmode" value="absMin" ${e.pctMode === 'absMin' ? 'checked' : ''}> |Δ%| ≥ N</label>
-        <label><input type="radio" name="pmode" value="topMaxN" ${e.pctMode === 'topMaxN' ? 'checked' : ''}> Top N highest %</label>
-        <label><input type="radio" name="pmode" value="topMinN" ${e.pctMode === 'topMinN' ? 'checked' : ''}> Top N lowest %</label>
+        <label><input type="radio" name="pmode" value="absMin" ${e.pctMode === 'absMin' ? 'checked' : ''}> |%| ≥ N</label>
+        <label><input type="radio" name="pmode" value="topMaxN" ${e.pctMode === 'topMaxN' ? 'checked' : ''}> Top N highest</label>
+        <label><input type="radio" name="pmode" value="topMinN" ${e.pctMode === 'topMinN' ? 'checked' : ''}> Top N lowest</label>
         <label><input type="radio" name="pmode" value="topBothN" ${e.pctMode === 'topBothN' ? 'checked' : ''}> Top N highest + lowest</label>
       </div>
       <div id="pmode-detail" style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;"></div>
       <div class="preset-btns">
-        <button class="btn secondary" data-preset="abs50">|Δ%| ≥ 50</button>
-        <button class="btn secondary" data-preset="abs100">|Δ%| ≥ 100</button>
-        <button class="btn secondary" data-preset="abs200">|Δ%| ≥ 200</button>
+        <button class="btn secondary" data-preset="abs50">|%| ≥ 50</button>
+        <button class="btn secondary" data-preset="abs100">|%| ≥ 100</button>
+        <button class="btn secondary" data-preset="abs200">|%| ≥ 200</button>
         <button class="btn secondary" data-preset="stable">Stable only (±5%)</button>
         <button class="btn secondary" data-preset="reset">Reset filters</button>
       </div>
     </div>
-
     <div class="section-card">
-      <h4>Optional column filters <span class="help" title="Restrict to rows where a feed column matches a condition (e.g. Retailer contains 'FR'). All filters are AND-combined.">?</span></h4>
+      <h4>Optional column filters</h4>
       <div id="filter-list"></div>
       <button class="btn ghost small" id="add-filter-btn">+ Add filter</button>
     </div>
-
-    <div class="section-card" id="specials-card" ${inTop ? 'style="opacity:0.5;pointer-events:none;"' : ''}>
-      <h4>Special rows ${inTop ? '<span style="text-transform:none;font-weight:400;color:var(--muted);">(excluded in Top-N modes)</span>' : ''}</h4>
+    <div class="section-card" id="specials-card" ${e.pctMode.startsWith('top') ? 'style="opacity:0.5;pointer-events:none;"' : ''}>
+      <h4>Special rows ${e.pctMode.startsWith('top') ? '<span style="text-transform:none;font-weight:400;color:var(--muted);">(excluded in Top-N modes)</span>' : ''}</h4>
       <div style="display:flex;gap:14px;flex-wrap:wrap;">
-        <label><input type="checkbox" id="inc-dropped" ${e.includeSpecials.dropped ? 'checked' : ''}> Include Dropped</label>
-        <label><input type="checkbox" id="inc-new" ${e.includeSpecials.new ? 'checked' : ''}> Include New</label>
-        <label><input type="checkbox" id="inc-missing" ${e.includeSpecials.missing ? 'checked' : ''}> Include Missing</label>
+        ${isVar ? `
+          <label><input type="checkbox" id="inc-missing" ${e.includeSpecials.missing ? 'checked' : ''}> Include Missing</label>
+          <label><input type="checkbox" id="inc-single" ${e.includeSpecials.single ? 'checked' : ''}> Include Single-retailer</label>
+          <label><input type="checkbox" id="inc-noAvg" ${e.includeSpecials.noAvg ? 'checked' : ''}> Include No-average</label>
+        ` : `
+          <label><input type="checkbox" id="inc-dropped" ${e.includeSpecials.dropped ? 'checked' : ''}> Include Dropped</label>
+          <label><input type="checkbox" id="inc-new" ${e.includeSpecials.new ? 'checked' : ''}> Include New</label>
+          <label><input type="checkbox" id="inc-missing" ${e.includeSpecials.missing ? 'checked' : ''}> Include Missing</label>
+        `}
       </div>
     </div>
-
     <div class="section-card">
-      <h4><label style="display:inline-flex;align-items:center;gap:8px;font-size:12px;text-transform:uppercase;color:var(--accent);"><input type="checkbox" id="personalize" ${e.personalize ? 'checked' : ''}> Personalize columns to include</label></h4>
+      <h4><label style="display:inline-flex;align-items:center;gap:8px;font-size:12px;text-transform:uppercase;color:var(--accent);"><input type="checkbox" id="personalize" ${e.personalize ? 'checked' : ''}> Personalize columns</label></h4>
       <div id="personalize-box" class="${e.personalize ? '' : 'hide'}">
-        <div style="color:var(--muted);font-size:12px;margin-bottom:8px;">These choices are linked to "Customize columns" in the drawer — they stay synced.</div>
+        <div style="color:var(--muted);font-size:12px;margin-bottom:8px;">Synced with "Customize columns" in the drawer.</div>
         <div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:10px;">
-          <label><input type="checkbox" data-pref="showRowType" ${state.columnPrefs.showRowType ? 'checked' : ''}> Row type (matched / dropped / new / missing)</label>
+          <label><input type="checkbox" data-pref="showRowType" ${state.columnPrefs.showRowType ? 'checked' : ''}> Row type</label>
           <label><input type="checkbox" data-pref="showBucket" ${state.columnPrefs.showBucket ? 'checked' : ''}> Bucket label</label>
-          <label><input type="checkbox" data-pref="showMatchKeys" ${state.columnPrefs.showMatchKeys ? 'checked' : ''}> Match key columns</label>
-          <label><input type="checkbox" data-pref="showGroupBys" ${state.columnPrefs.showGroupBys ? 'checked' : ''}> Group-by columns</label>
-          <label><input type="checkbox" data-pref="showPrevValue" ${state.columnPrefs.showPrevValue ? 'checked' : ''}> Previous value (per compare col)</label>
-          <label><input type="checkbox" data-pref="showNewValue" ${state.columnPrefs.showNewValue ? 'checked' : ''}> New value (per compare col)</label>
-          <label><input type="checkbox" data-pref="showDeltaPct" ${state.columnPrefs.showDeltaPct ? 'checked' : ''}> Δ % (per compare col)</label>
+          <label><input type="checkbox" data-pref="showMatchKeys" ${state.columnPrefs.showMatchKeys ? 'checked' : ''}> Match key / identifier</label>
+          <label><input type="checkbox" data-pref="showGroupBys" ${state.columnPrefs.showGroupBys ? 'checked' : ''}> Group-by</label>
+          <label><input type="checkbox" data-pref="showPrevValue" ${state.columnPrefs.showPrevValue ? 'checked' : ''}> ${isVar ? 'Group average' : 'Previous value'}</label>
+          <label><input type="checkbox" data-pref="showNewValue" ${state.columnPrefs.showNewValue ? 'checked' : ''}> ${isVar ? 'Retailer price' : 'New value'}</label>
+          <label><input type="checkbox" data-pref="showDeltaPct" ${state.columnPrefs.showDeltaPct ? 'checked' : ''}> ${isVar ? 'Variance' : 'Δ'} %</label>
         </div>
-        <div class="lbl" style="text-transform:none;color:var(--muted);font-weight:400;margin-bottom:6px;">Other feed columns to include (alphabetical, common to both files)</div>
+        <div class="lbl" style="text-transform:none;color:var(--muted);font-weight:400;margin-bottom:6px;">Other source columns (alphabetical)</div>
         <div class="checkbox-grid" id="feed-cols-grid"></div>
       </div>
     </div>
   `;
 
+  body.querySelectorAll('input[name="etarget"]').forEach(r => r.addEventListener('change', ev => { e.target = ev.target.value; renderExportBody(); updateExportSummary(); }));
   renderPmodeDetail();
-  body.querySelectorAll('input[name="pmode"]').forEach(r => r.addEventListener('change', ev => {
-    e.pctMode = ev.target.value;
-    renderExportBody();        // re-render to enable/disable specials card
-    updateExportSummary();
-  }));
+  body.querySelectorAll('input[name="pmode"]').forEach(r => r.addEventListener('change', ev => { e.pctMode = ev.target.value; renderExportBody(); updateExportSummary(); }));
   body.querySelectorAll('[data-preset]').forEach(b => b.addEventListener('click', ev => { ev.preventDefault(); applyExportPreset(b.dataset.preset); }));
-
   renderFilters();
-  $('#add-filter-btn').addEventListener('click', () => {
-    e.filters.push({ col: allCols[0] || '', op: 'contains', val: '' });
-    renderFilters(); updateExportSummary();
-  });
+  $('#add-filter-btn').addEventListener('click', () => { e.filters.push({ col: allCols[0] || '', op: 'contains', val: '' }); renderFilters(); updateExportSummary(); });
 
-  $('#inc-dropped').addEventListener('change', ev => { e.includeSpecials.dropped = ev.target.checked; updateExportSummary(); });
-  $('#inc-new').addEventListener('change', ev => { e.includeSpecials.new = ev.target.checked; updateExportSummary(); });
-  $('#inc-missing').addEventListener('change', ev => { e.includeSpecials.missing = ev.target.checked; updateExportSummary(); });
+  ['inc-dropped','inc-new','inc-missing','inc-single','inc-noAvg'].forEach(id => { const el = document.getElementById(id); if (el) el.addEventListener('change', ev => { const key = id.replace('inc-', ''); e.includeSpecials[key] = ev.target.checked; updateExportSummary(); }); });
 
-  $('#personalize').addEventListener('change', ev => {
-    e.personalize = ev.target.checked;
-    $('#personalize-box').classList.toggle('hide', !e.personalize);
-  });
-  body.querySelectorAll('[data-pref]').forEach(cb => cb.addEventListener('change', ev => {
-    state.columnPrefs[cb.dataset.pref] = ev.target.checked;
-  }));
+  $('#personalize').addEventListener('change', ev => { e.personalize = ev.target.checked; $('#personalize-box').classList.toggle('hide', !e.personalize); });
+  body.querySelectorAll('[data-pref]').forEach(cb => cb.addEventListener('change', ev => { state.columnPrefs[cb.dataset.pref] = ev.target.checked; }));
 
-  // Feed-cols grid — common columns between both files, alphabetical
-  const inter = intersectCols();
-  const reserved = new Set([...state.results.matchKeys, ...state.results.groupByCols, ...state.results.cmps]);
-  const extrasOptions = inter.filter(c => !reserved.has(c)).sort((a,b) => a.localeCompare(b));
+  const reserved = new Set([...R.matchKeys, ...R.groupByCols, ...R.cmps]);
+  const extrasOptions = allCols.filter(c => !reserved.has(c)).sort((a, b) => a.localeCompare(b));
   const grid = $('#feed-cols-grid');
-  extrasOptions.forEach(c => {
-    const present = state.columnPrefs.extras.includes(c);
-    const lab = document.createElement('label');
-    lab.innerHTML = `<input type="checkbox" ${present ? 'checked' : ''}> ${escapeHtml(c)}`;
-    lab.querySelector('input').addEventListener('change', ev => {
-      if (ev.target.checked) { if (!state.columnPrefs.extras.includes(c)) state.columnPrefs.extras.push(c); }
-      else state.columnPrefs.extras = state.columnPrefs.extras.filter(x => x !== c);
-    });
-    grid.appendChild(lab);
-  });
+  extrasOptions.forEach(c => { const present = state.columnPrefs.extras.includes(c); const lab = document.createElement('label'); lab.innerHTML = `<input type="checkbox" ${present ? 'checked' : ''}> ${escapeHtml(c)}`; lab.querySelector('input').addEventListener('change', ev => { if (ev.target.checked) { if (!state.columnPrefs.extras.includes(c)) state.columnPrefs.extras.push(c); } else state.columnPrefs.extras = state.columnPrefs.extras.filter(x => x !== c); }); grid.appendChild(lab); });
 }
 
 function renderPmodeDetail() {
   const e = state.export;
   const wrap = $('#pmode-detail'); wrap.innerHTML = '';
   if (e.pctMode === 'range') {
-    wrap.innerHTML = `
-      <label class="field" style="margin:0;flex:1;min-width:140px;">
-        <span class="lbl">Min %</span>
-        <input type="number" id="ex-pmin" value="${e.pctMin == null ? '' : e.pctMin}" placeholder="e.g. -50">
-      </label>
-      <label class="field" style="margin:0;flex:1;min-width:140px;">
-        <span class="lbl">Max %</span>
-        <input type="number" id="ex-pmax" value="${e.pctMax == null ? '' : e.pctMax}" placeholder="e.g. 100">
-      </label>`;
+    wrap.innerHTML = `<label class="field" style="margin:0;flex:1;min-width:140px;"><span class="lbl">Min %</span><input type="number" id="ex-pmin" value="${e.pctMin == null ? '' : e.pctMin}" placeholder="e.g. -50"></label><label class="field" style="margin:0;flex:1;min-width:140px;"><span class="lbl">Max %</span><input type="number" id="ex-pmax" value="${e.pctMax == null ? '' : e.pctMax}" placeholder="e.g. 100"></label>`;
     $('#ex-pmin').addEventListener('change', ev => { e.pctMin = ev.target.value === '' ? null : Number(ev.target.value); updateExportSummary(); });
     $('#ex-pmax').addEventListener('change', ev => { e.pctMax = ev.target.value === '' ? null : Number(ev.target.value); updateExportSummary(); });
   } else if (e.pctMode === 'absMin') {
-    wrap.innerHTML = `
-      <label class="field" style="margin:0;flex:1;min-width:160px;">
-        <span class="lbl">|Δ%| ≥</span>
-        <input type="number" id="ex-absmin" value="${e.absMin == null ? '' : e.absMin}" placeholder="e.g. 50" min="0" step="1">
-      </label>
-      <div style="color:var(--muted);font-size:12px;align-self:center;">Keeps only rows whose absolute % change is at least this much.</div>`;
+    wrap.innerHTML = `<label class="field" style="margin:0;flex:1;min-width:160px;"><span class="lbl">|%| ≥</span><input type="number" id="ex-absmin" value="${e.absMin == null ? '' : e.absMin}" placeholder="e.g. 50" min="0" step="1"></label>`;
     $('#ex-absmin').addEventListener('change', ev => { e.absMin = ev.target.value === '' ? null : Math.abs(Number(ev.target.value)); updateExportSummary(); });
-  } else if (e.pctMode === 'topMaxN' || e.pctMode === 'topMinN' || e.pctMode === 'topBothN') {
-    const label = e.pctMode === 'topMaxN' ? 'How many highest-% rows?' : e.pctMode === 'topMinN' ? 'How many lowest-% rows?' : 'How many on each side?';
-    wrap.innerHTML = `
-      <label class="field" style="margin:0;flex:1;min-width:160px;">
-        <span class="lbl">${escapeHtml(label)}</span>
-        <input type="number" id="ex-topn" value="${e.topN}" min="1" step="1">
-      </label>
-      <div class="preset-btns">
-        <button class="btn secondary" data-n="50">50</button>
-        <button class="btn secondary" data-n="100">100</button>
-        <button class="btn secondary" data-n="200">200</button>
-      </div>
-      <div style="color:var(--muted);font-size:12px;width:100%;margin-top:6px;">Specials (Dropped / New / Missing) are excluded in Top-N modes.</div>`;
+  } else if (e.pctMode.startsWith('top')) {
+    const label = e.pctMode === 'topMaxN' ? 'How many highest %?' : e.pctMode === 'topMinN' ? 'How many lowest %?' : 'How many each side?';
+    wrap.innerHTML = `<label class="field" style="margin:0;flex:1;min-width:160px;"><span class="lbl">${escapeHtml(label)}</span><input type="number" id="ex-topn" value="${e.topN}" min="1" step="1"></label><div class="preset-btns"><button class="btn secondary" data-n="50">50</button><button class="btn secondary" data-n="100">100</button><button class="btn secondary" data-n="200">200</button></div>`;
     $('#ex-topn').addEventListener('change', ev => { e.topN = Math.max(1, Number(ev.target.value) || 1); updateExportSummary(); });
     wrap.querySelectorAll('[data-n]').forEach(b => b.addEventListener('click', ev => { ev.preventDefault(); e.topN = Number(b.dataset.n); $('#ex-topn').value = e.topN; updateExportSummary(); }));
   }
 }
-
 function applyExportPreset(name) {
   const e = state.export;
   if (name === 'reset') { e.pctMode = 'any'; e.pctMin = e.pctMax = e.absMin = null; e.filters = []; }
@@ -1814,147 +2426,22 @@ function applyExportPreset(name) {
   else if (name === 'abs100') { e.pctMode = 'absMin'; e.absMin = 100; }
   else if (name === 'abs200') { e.pctMode = 'absMin'; e.absMin = 200; }
   else if (name === 'stable') { e.pctMode = 'range'; e.pctMin = -5; e.pctMax = 5; }
-  renderExportBody();
-  updateExportSummary();
+  renderExportBody(); updateExportSummary();
 }
-
 function renderFilters() {
   const wrap = $('#filter-list'); wrap.innerHTML = '';
   const e = state.export;
-  const newE = state.pool.find(en => en.id === state.newId);
+  const R = exportTargetResults();
+  const srcId = R.mode === 'variance' ? state.variance.sourceId : state.newId;
+  const newE = state.pool.find(en => en.id === srcId);
   const allCols = newE ? newE.parsed.cols : [];
   e.filters.forEach((f, i) => {
     const row = document.createElement('div'); row.className = 'filter-row';
-    row.innerHTML = `
-      <select class="col-pick" data-i="${i}" data-k="col">${allCols.map(c => `<option value="${escapeAttr(c)}" ${c === f.col ? 'selected' : ''}>${escapeHtml(c)}</option>`).join('')}</select>
-      <select class="op-pick" data-i="${i}" data-k="op">${FILTER_OPS.map(o => `<option value="${o.id}" ${o.id === f.op ? 'selected' : ''}>${escapeHtml(o.label)}</option>`).join('')}</select>
-      <input type="text" class="val" data-i="${i}" data-k="val" value="${escapeAttr(f.val || '')}" placeholder="value">
-      <button class="rm" data-i="${i}">×</button>
-    `;
+    row.innerHTML = `<select class="col-pick" data-i="${i}" data-k="col">${allCols.map(c => `<option value="${escapeAttr(c)}" ${c === f.col ? 'selected' : ''}>${escapeHtml(c)}</option>`).join('')}</select><select class="op-pick" data-i="${i}" data-k="op">${FILTER_OPS.map(o => `<option value="${o.id}" ${o.id === f.op ? 'selected' : ''}>${escapeHtml(o.label)}</option>`).join('')}</select><input type="text" class="val" data-i="${i}" data-k="val" value="${escapeAttr(f.val || '')}" placeholder="value"><button class="rm" data-i="${i}">×</button>`;
     wrap.appendChild(row);
   });
-  wrap.querySelectorAll('select, input').forEach(el => el.addEventListener('change', ev => {
-    const i = Number(el.dataset.i); const k = el.dataset.k;
-    state.export.filters[i][k] = el.value;
-    updateExportSummary();
-  }));
-  wrap.querySelectorAll('.rm').forEach(b => b.addEventListener('click', () => {
-    const i = Number(b.dataset.i);
-    state.export.filters.splice(i, 1);
-    renderFilters();
-    updateExportSummary();
-  }));
-}
-
-function applyFilter(row, filt) {
-  if (!filt.col) return true;
-  const pr = row.prev || {}, nr = row.new || {};
-  const raw = (nr[filt.col] != null && nr[filt.col] !== '') ? nr[filt.col] : (pr[filt.col] || '');
-  const s = String(raw == null ? '' : raw);
-  const v = filt.val == null ? '' : String(filt.val);
-  const sl = s.toLowerCase(), vl = v.toLowerCase();
-  switch (filt.op) {
-    case 'contains': return sl.includes(vl);
-    case 'ncontains': return !sl.includes(vl);
-    case 'eq': return sl === vl;
-    case 'neq': return sl !== vl;
-    case 'starts': return sl.startsWith(vl);
-    case 'ends': return sl.endsWith(vl);
-    case 'gte': return Number(s) >= Number(v);
-    case 'lte': return Number(s) <= Number(v);
-    case 'gt': return Number(s) > Number(v);
-    case 'lt': return Number(s) < Number(v);
-    case 'empty': return !s;
-    case 'nempty': return !!s;
-  }
-  return true;
-}
-
-// One unified row per unique SKU, carrying every cmpCol's status (matched/dropped/new/missing) and pct.
-function collectCombinedExportEntries() {
-  const e = state.export; if (!e) return [];
-  const labels = bucketLabels(state.results.edges);
-  const entries = new Map(); // matchKey -> { prev, new, perCmp: {[cmpCol]: {ov, nv, pct, kind, bucket}} }
-
-  for (const cmpCol of state.results.cmps) {
-    const groupMap = state.results.results[cmpCol].groups;
-    for (const [_, g] of groupMap) {
-      for (let bi = 0; bi < labels.length; bi++) {
-        for (const r of (g.rows[bi] || [])) {
-          let en = entries.get(r.key);
-          if (!en) { en = { prev: r.prev, new: r.new, perCmp: {} }; entries.set(r.key, en); }
-          en.perCmp[cmpCol] = { ov: r.ov, nv: r.nv, pct: r.pct, kind: 'matched', bucket: labels[bi] };
-        }
-      }
-      for (const kind of ['dropped', 'new', 'missing']) {
-        for (const r of g.specialRows[kind]) {
-          let en = entries.get(r.key);
-          if (!en) { en = { prev: r.prev, new: r.new, perCmp: {} }; entries.set(r.key, en); }
-          en.perCmp[cmpCol] = { ov: r.ov || null, nv: r.nv || null, pct: null, kind, bucket: '' };
-        }
-      }
-    }
-  }
-
-  let arr = Array.from(entries.values());
-
-  // % filter — applied OR across compare columns (row passes if any cmpCol satisfies)
-  if (e.pctMode === 'range') {
-    arr = arr.filter(en => Object.values(en.perCmp).some(pc => {
-      if (!Number.isFinite(pc.pct)) return false;
-      if (e.pctMin != null && pc.pct < e.pctMin) return false;
-      if (e.pctMax != null && pc.pct > e.pctMax) return false;
-      return true;
-    }));
-  } else if (e.pctMode === 'absMin') {
-    if (e.absMin != null) {
-      arr = arr.filter(en => Object.values(en.perCmp).some(pc => Number.isFinite(pc.pct) && Math.abs(pc.pct) >= e.absMin));
-    }
-  } else if (e.pctMode === 'topMaxN') {
-    arr = arr.filter(entryHasFinitePct).sort((a, b) => entryMaxPct(b) - entryMaxPct(a)).slice(0, e.topN);
-  } else if (e.pctMode === 'topMinN') {
-    arr = arr.filter(entryHasFinitePct).sort((a, b) => entryMinPct(a) - entryMinPct(b)).slice(0, e.topN);
-  } else if (e.pctMode === 'topBothN') {
-    const finite = arr.filter(entryHasFinitePct);
-    const high = finite.slice().sort((a, b) => entryMaxPct(b) - entryMaxPct(a)).slice(0, e.topN);
-    const low = finite.slice().sort((a, b) => entryMinPct(a) - entryMinPct(b)).slice(0, e.topN);
-    const seen = new Set();
-    arr = [...high, ...low].filter(en => { const k = entryKey(en); if (seen.has(k)) return false; seen.add(k); return true; });
-  }
-
-  // Column filters — applied to feed values of the row
-  if (e.filters && e.filters.length) {
-    arr = arr.filter(en => e.filters.every(f => applyFilterToEntry(en, f)));
-  }
-
-  // Specials inclusion (non-top modes only — Top-N modes already require finite pct)
-  const inTop = e.pctMode.startsWith('top');
-  if (!inTop) {
-    arr = arr.filter(en => {
-      const kinds = Object.values(en.perCmp).map(pc => pc.kind);
-      if (kinds.includes('matched')) return true;
-      return kinds.some(k => e.includeSpecials[k]);
-    });
-  }
-
-  return arr;
-}
-
-function entryHasFinitePct(en) { return Object.values(en.perCmp).some(pc => Number.isFinite(pc.pct)); }
-function entryMaxPct(en) {
-  let m = -Infinity;
-  for (const pc of Object.values(en.perCmp)) if (Number.isFinite(pc.pct) && pc.pct > m) m = pc.pct;
-  return m;
-}
-function entryMinPct(en) {
-  let m = Infinity;
-  for (const pc of Object.values(en.perCmp)) if (Number.isFinite(pc.pct) && pc.pct < m) m = pc.pct;
-  return m;
-}
-function entryKey(en) { return state.results.matchKeys.map(c => pickFromEntry(en, c)).join('||'); }
-function pickFromEntry(en, c) {
-  const nr = en.new || {}, pr = en.prev || {};
-  return (nr[c] != null && nr[c] !== '') ? nr[c] : (pr[c] || '');
+  wrap.querySelectorAll('select, input').forEach(el => el.addEventListener('change', ev => { const i = Number(el.dataset.i); const k = el.dataset.k; state.export.filters[i][k] = el.value; updateExportSummary(); }));
+  wrap.querySelectorAll('.rm').forEach(b => b.addEventListener('click', () => { const i = Number(b.dataset.i); state.export.filters.splice(i, 1); renderFilters(); updateExportSummary(); }));
 }
 function applyFilterToEntry(en, filt) {
   if (!filt.col) return true;
@@ -1978,52 +2465,77 @@ function applyFilterToEntry(en, filt) {
   }
   return true;
 }
+function pickFromEntry(en, c) { const nr = en.new || {}, pr = en.prev || {}; return (nr[c] != null && nr[c] !== '') ? nr[c] : (pr[c] || ''); }
+function entryHasFinitePct(en) { return Object.values(en.perCmp).some(pc => Number.isFinite(pc.pct)); }
+function entryMaxPct(en) { let m = -Infinity; for (const pc of Object.values(en.perCmp)) if (Number.isFinite(pc.pct) && pc.pct > m) m = pc.pct; return m; }
+function entryMinPct(en) { let m = Infinity; for (const pc of Object.values(en.perCmp)) if (Number.isFinite(pc.pct) && pc.pct < m) m = pc.pct; return m; }
+function entryKey(en, R) { return R.matchKeys.map(c => pickFromEntry(en, c)).join('||'); }
+
+function collectCombinedExportEntries() {
+  const e = state.export; if (!e) return [];
+  const R = exportTargetResults();
+  const labels = bucketLabels(R.edges);
+  const entries = new Map();
+  for (const cmpCol of R.cmps) {
+    const groupMap = R.results[cmpCol].groups;
+    for (const [_, g] of groupMap) {
+      for (let bi = 0; bi < labels.length; bi++) {
+        for (const r of (g.rows[bi] || [])) {
+          let en = entries.get(r.key);
+          if (!en) { en = { prev: r.prev, new: r.new, perCmp: {} }; entries.set(r.key, en); }
+          en.perCmp[cmpCol] = { ov: r.ov, nv: r.nv, pct: r.pct, kind: 'matched', bucket: labels[bi] };
+        }
+      }
+      for (const kind of ['dropped', 'new', 'missing', 'single', 'noAvg']) {
+        for (const r of (g.specialRows[kind] || [])) {
+          let en = entries.get(r.key);
+          if (!en) { en = { prev: r.prev, new: r.new, perCmp: {} }; entries.set(r.key, en); }
+          en.perCmp[cmpCol] = { ov: r.ov != null ? r.ov : null, nv: r.nv != null ? r.nv : null, pct: r.pct != null ? r.pct : null, kind, bucket: '' };
+        }
+      }
+    }
+  }
+  let arr = Array.from(entries.values());
+  if (e.pctMode === 'range') arr = arr.filter(en => Object.values(en.perCmp).some(pc => { if (!Number.isFinite(pc.pct)) return false; if (e.pctMin != null && pc.pct < e.pctMin) return false; if (e.pctMax != null && pc.pct > e.pctMax) return false; return true; }));
+  else if (e.pctMode === 'absMin') { if (e.absMin != null) arr = arr.filter(en => Object.values(en.perCmp).some(pc => Number.isFinite(pc.pct) && Math.abs(pc.pct) >= e.absMin)); }
+  else if (e.pctMode === 'topMaxN') arr = arr.filter(entryHasFinitePct).sort((a, b) => entryMaxPct(b) - entryMaxPct(a)).slice(0, e.topN);
+  else if (e.pctMode === 'topMinN') arr = arr.filter(entryHasFinitePct).sort((a, b) => entryMinPct(a) - entryMinPct(b)).slice(0, e.topN);
+  else if (e.pctMode === 'topBothN') { const finite = arr.filter(entryHasFinitePct); const high = finite.slice().sort((a, b) => entryMaxPct(b) - entryMaxPct(a)).slice(0, e.topN); const low = finite.slice().sort((a, b) => entryMinPct(a) - entryMinPct(b)).slice(0, e.topN); const seen = new Set(); arr = [...high, ...low].filter(en => { const k = entryKey(en, R); if (seen.has(k)) return false; seen.add(k); return true; }); }
+  if (e.filters && e.filters.length) arr = arr.filter(en => e.filters.every(f => applyFilterToEntry(en, f)));
+  const inTop = e.pctMode.startsWith('top');
+  if (!inTop) arr = arr.filter(en => { const kinds = Object.values(en.perCmp).map(pc => pc.kind); if (kinds.includes('matched')) return true; return kinds.some(k => e.includeSpecials[k]); });
+  return arr;
+}
 
 function buildCombinedExportColumns() {
   const e = state.export;
   const p = state.columnPrefs;
-  const newE = state.pool.find(en => en.id === state.newId);
+  const R = exportTargetResults();
+  const isVar = R.mode === 'variance';
+  const srcId = isVar ? state.variance.sourceId : state.newId;
+  const newE = state.pool.find(en => en.id === srcId);
   const allFeedCols = newE ? newE.parsed.cols : [];
-  const cmps = state.results.cmps;
+  const cmps = R.cmps;
   const cols = [];
-
   if (e.personalize) {
     if (p.showRowType) cmps.forEach(c => cols.push({ key: cmps.length > 1 ? `row_type (${c})` : 'row_type', getValue: en => (en.perCmp[c] || {}).kind || '' }));
     if (p.showBucket)  cmps.forEach(c => cols.push({ key: cmps.length > 1 ? `bucket (${c})` : 'bucket', getValue: en => (en.perCmp[c] || {}).bucket || '' }));
-    if (p.showMatchKeys) state.results.matchKeys.forEach(c => cols.push({ key: c, getValue: en => pickFromEntry(en, c) }));
-    if (p.showGroupBys) state.results.groupByCols.forEach(c => { if (!state.results.matchKeys.includes(c)) cols.push({ key: c, getValue: en => pickFromEntry(en, c) }); });
-    if (p.showNewValue) cmps.forEach(c => cols.push({ key: cmps.length > 1 ? c + ' (new)' : c, getValue: en => (en.new || {})[c] || '' }));
-    if (p.showPrevValue) cmps.forEach(c => cols.push({ key: c + ' (previous)', getValue: en => (en.prev || {})[c] || '' }));
-    if (p.showDeltaPct) cmps.forEach(c => cols.push({ key: 'delta_pct (' + c + ')', getValue: en => { const pc = en.perCmp[c]; return pc && pc.pct != null ? formatPctForExport(pc.pct) : ''; } }));
-    const reserved = new Set([...state.results.matchKeys, ...state.results.groupByCols, ...cmps]);
+    if (p.showMatchKeys) R.matchKeys.forEach(c => cols.push({ key: c, getValue: en => pickFromEntry(en, c) }));
+    if (p.showGroupBys) R.groupByCols.forEach(c => { if (!R.matchKeys.includes(c)) cols.push({ key: c, getValue: en => pickFromEntry(en, c) }); });
+    if (p.showNewValue) cmps.forEach(c => cols.push({ key: cmps.length > 1 ? c + (isVar ? ' (retailer price)' : ' (new)') : c, getValue: en => (en.new || {})[c] || '' }));
+    if (p.showPrevValue) cmps.forEach(c => cols.push({ key: c + (isVar ? ' (group avg)' : ' (previous)'), getValue: en => { const pc = en.perCmp[c]; return pc && pc.ov != null ? pc.ov : ((en.prev || {})[c] || ''); } }));
+    if (p.showDeltaPct) cmps.forEach(c => cols.push({ key: (isVar ? 'variance_pct' : 'delta_pct') + ' (' + c + ')', getValue: en => { const pc = en.perCmp[c]; return pc && pc.pct != null ? formatPctForExport(pc.pct) : ''; } }));
+    const reserved = new Set([...R.matchKeys, ...R.groupByCols, ...cmps]);
     p.extras.forEach(c => { if (!reserved.has(c)) cols.push({ key: c, getValue: en => pickFromEntry(en, c) }); });
   } else {
-    // Default: all feed cols (in new-file order) + per cmpCol (previous value + delta_pct)
-    // NO row_type, NO bucket.
     allFeedCols.forEach(c => cols.push({ key: c, getValue: en => pickFromEntry(en, c) }));
-    cmps.forEach(c => cols.push({ key: c + ' (previous)', getValue: en => (en.prev || {})[c] || '' }));
-    cmps.forEach(c => cols.push({ key: 'delta_pct (' + c + ')', getValue: en => { const pc = en.perCmp[c]; return pc && pc.pct != null ? formatPctForExport(pc.pct) : ''; } }));
+    cmps.forEach(c => cols.push({ key: c + (isVar ? ' (group avg)' : ' (previous)'), getValue: en => { const pc = en.perCmp[c]; return pc && pc.ov != null ? pc.ov : ((en.prev || {})[c] || ''); } }));
+    cmps.forEach(c => cols.push({ key: (isVar ? 'variance_pct' : 'delta_pct') + ' (' + c + ')', getValue: en => { const pc = en.perCmp[c]; return pc && pc.pct != null ? formatPctForExport(pc.pct) : ''; } }));
   }
   return cols;
 }
-
-function pickFromRow(r, c) {
-  const nr = r.new || {}, pr = r.prev || {};
-  return (nr[c] != null && nr[c] !== '') ? nr[c] : (pr[c] || '');
-}
-function formatPctForExport(p) {
-  if (p == null || p === '') return '';
-  if (!Number.isFinite(p)) return 'inf';
-  return Number(p);
-}
-
-function updateExportSummary() {
-  if (!state.export) return;
-  const n = collectCombinedExportEntries().length;
-  const ncmp = state.results.cmps.length;
-  $('#export-summary').textContent = `${n.toLocaleString()} row(s) match — one row per unique SKU across ${ncmp} compare column${ncmp > 1 ? 's' : ''}`;
-}
-
+function formatPctForExport(p) { if (p == null || p === '') return ''; if (!Number.isFinite(p)) return 'inf'; return Number(p); }
+function updateExportSummary() { if (!state.export) return; const R = exportTargetResults(); const n = collectCombinedExportEntries().length; const ncmp = R.cmps.length; $('#export-summary').textContent = `${n.toLocaleString()} row(s) match — one row per unique SKU across ${ncmp} compare column${ncmp > 1 ? 's' : ''}`; }
 function runExportXlsx() {
   if (!state.export) return;
   const entries = collectCombinedExportEntries();
@@ -2031,21 +2543,16 @@ function runExportXlsx() {
   const cols = buildCombinedExportColumns();
   const aoa = [cols.map(c => c.key)];
   for (const en of entries) aoa.push(cols.map(c => c.getValue(en)));
-  writeXlsx([{ name: 'QC export', aoa }], `qc_export_${Date.now()}.xlsx`);
+  writeXlsx([{ name: 'QC export', aoa }], `qc_${state.export.target}_${Date.now()}.xlsx`);
   closeExport();
 }
-
 function closeExport() { $('#export-bg').classList.remove('open'); state.export = null; }
 
-// ===========================================================================
+// ============================================================================
 // Helpers
-// ===========================================================================
+// ============================================================================
 function sanitize(s) { return String(s).replace(/[^a-z0-9_-]+/gi, '_').slice(0, 60); }
-function formatBytes(b) {
-  if (b < 1024) return b + ' B';
-  if (b < 1024 * 1024) return (b / 1024).toFixed(1) + ' KB';
-  return (b / 1024 / 1024).toFixed(1) + ' MB';
-}
+function formatBytes(b) { if (b < 1024) return b + ' B'; if (b < 1024 * 1024) return (b / 1024).toFixed(1) + ' KB'; return (b / 1024 / 1024).toFixed(1) + ' MB'; }
 function escapeHtml(s) { return String(s).replace(/[&<>"']/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c])); }
 function escapeAttr(s) { return escapeHtml(s); }
 </script>
